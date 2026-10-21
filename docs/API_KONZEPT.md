@@ -1,6 +1,6 @@
 # API-Konzept: Mobile Schnittstelle für HomeCenter
 
-Stand: 2026-10-21 · Status: Entwurf zur Abstimmung
+Stand: 2026-10-21 · Status: abgestimmt (siehe Abschnitt 10)
 
 Grundlage ist eine Codeanalyse von `SRyoshi2/HomeCenter` (Django 5.0.7, DRF installiert).
 Alles hier Beschriebene betrifft **HomeCenter** (neue App `mobile_api`), nicht diesen
@@ -312,12 +312,15 @@ Jede Phase ist für sich auslieferbar. Die Instanzen brauchen dafür jeweils ein
 6. **Fälligkeiten ohne Scheduler:** Hinweise (OweMe, Impfungen, Checks) erscheinen in der App nur
    beim Öffnen. Push ist Stufe 2 und verlangt pro Instanz Scheduler und FCM.
 
-## 10. Offene Fragen
+## 10. Entscheidungen
 
-1. Soll `mobile_api` direkt in HomeCenter liegen, oder als eigenes Paket, das die Instanzen
-   einbinden? (Empfehlung: direkt im Repo, damit Models und Services ohne Umweg nutzbar sind.)
-2. Token-Laufzeit: 90 Tage Gleitfrist in Ordnung?
-3. Darf die App Rezepte anlegen und bearbeiten (Phase 3) oder reicht Lesen plus Übergabe an die Liste?
-4. Wie soll mit Konten umgegangen werden, die zwar `abo_1` haben, aber Health nicht aktiviert
-   haben? (Vorschlag: App zeigt Aktivierungshinweis und bietet `/health/profile/enable/` an.)
-5. Client-Technik: Kotlin/Jetpack Compose (Empfehlung bei reinem Android) oder Flutter?
+Am 2026-10-21 abgestimmt:
+
+1. **Ablage:** `mobile_api` liegt direkt im HomeCenter-Repo, damit Models und Services ohne Umweg nutzbar sind.
+2. **Token-Laufzeit:** 90 Tage Gleitfrist.
+3. **Rezepte:** Die App darf Rezepte anlegen und bearbeiten (Phase 3 bleibt im Umfang).
+4. **Health nicht aktiviert:** Die App zeigt einen Aktivierungshinweis und bietet `/health/profile/enable/` an.
+5. **Client:** Kotlin mit Jetpack Compose (nur Android).
+
+Noch offen: keine fachlichen Fragen. Vor Phase 0 ist zu klären, auf welchem Branch im
+HomeCenter-Repo die API entwickelt wird.
