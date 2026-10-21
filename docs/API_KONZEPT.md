@@ -55,7 +55,7 @@ Nutzern, Speiseplan und Einkaufsplan, Veröffentlichen im Social-Feed.
 Die Middleware erkennt `/api/v1/...` nicht. Zwei Wege, entweder
 (a) Regex auf `[a-z0-9_]+` ändern und Schlüssel `v1` überspringen, oder
 (b) eine eigene Berechtigungsklasse `AppEnabled('health')` in `mobile_api`, die
-`home.middleware.app_is_hidden(...)` abfragt. **Empfehlung: (b)**, ohne Eingriff in die Middleware
+`home.middleware.app_is_hidden(...)` abfragt. `app_is_hidden` erwartet einen `url_name`; die Klasse löst den Schlüssel deshalb über `APP_PATH_KEYS` auf (`health`→`health_dashboard`, `rezepte`→`rezept_overview`, `einkaufsliste`→`einkaufsliste_overview`, `oweme`→`oweme_overview`). **Empfehlung: (b)**, ohne Eingriff in die Middleware
 und je Endpunkt explizit.
 
 Zusätzlich je Endpunkt:
@@ -91,8 +91,8 @@ Regeln:
 - Drosselung pro IP und Benutzername (z. B. 5 Fehlversuche je 10 Minuten, Cache-basiert wie
   die Registrierung).
 - Header: `Authorization: Bearer <token>`. Die API-Views setzen **keine** Session- und
-  keine CSRF-Authentifizierung voraus.
-- Passwortänderung widerruft alle Tokens des Kontos.
+  keine CSRF-Authentifizierung voraus. Die Bearer-Klasse hängt nur an den `mobile_api`-Views, `social/api_views.py` bleibt bei der Session.
+- Passwortänderung widerruft alle Tokens des Kontos (Signal auf dem Benutzermodell, greift also auch bei Passwort-Reset und Änderung im Admin).
 - Passwort-Reset und Registrierung bleiben im Web (Link in der App).
 
 ## 5. Meta und Versionierung
@@ -105,9 +105,11 @@ Regeln:
   "mode": "family",
   "api_version": 1,
   "min_client_version": 1,
-  "server_version": "0.93.1056"
+  "server_version": "0.93.1058"
 }
 ```
+
+`server_version` hat im HomeCenter heute keine Quelle im Python-Code (die Nummer steht nur in `base.html`). Phase 0 führt dafür `SERVER_VERSION` in `home/produkt.py` ein; ein Test hält sie mit `base.html` gleich. `mode` ist `family` oder `office`.
 
 `GET /api/v1/me/` (angemeldet): Benutzer, Anzeigename und Freischaltungen.
 
@@ -220,9 +222,9 @@ Alle Endpunkte hinter `abo_1` **und** `HealthProfile.enabled` (außer Profil/Akt
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET/PATCH | `/health/profile/` | Stammdaten, Zielgewicht, Trainingsschalter |
+| GET/PATCH | `/health/profile/` | Stammdaten, Zielgewicht (Ziel-Logik in `health/services/ziel.py`), Trainingsschalter |
 | POST | `/health/profile/enable/` | Health ein-/ausschalten (`health_toggle`) |
-| GET/POST | `/health/weights/` | Gewichtsverlauf, Eintrag |
+| GET/POST | `/health/weights/` | Gewichtsverlauf, Eintrag (Grenzen 20–400 kg serverseitig in `WeightEntryForm`, daher Form wiederverwenden) |
 | DELETE | `/health/weights/<id>/` | Eintrag löschen |
 
 **Kalorientracker** (`CalorieDay`, `CalorieEntry`, `MahlzeitVorlage`)
@@ -259,12 +261,20 @@ Dokumente liegen bewusst in privatem Speicher ohne öffentliche URL (`PrivateMed
 Die API behält das bei: Auslieferung nur durch eine authentifizierte View, kein Link in der
 Antwort, den man ohne Token öffnen könnte. Der Client lädt über Header und speichert lokal.
 
-**Laborwerte** (`Laborwert`, `Laboranalyse`): `/health/labs/` (Liste, anlegen), `/health/labs/<id>/`,
-`/health/labs/trend/?name=` (Verlauf), `/health/labs/analysis/` (nur lesen; Erstellung ist
-KI-abhängig und gehört nicht zu Stufe 1).
+**Laborwerte** (`Laborwert`, `Laboranalyse`; Stand 0.93.1056–1058). Im Web gehören sie zu den Gesundheitschecks. Jede Messung hat einen eigenen Referenzbereich und eine berechnete Einstufung (zu niedrig/normal/zu hoch u. a.); sie kann an einem Arztbesuch (`HealthCheck`) hängen (`health_check`, Herkunft „Besuch“) und erscheint dann in derselben Übersicht. Gemeinsame Regeln liegen in `health/services/labor.py`, Validierung in `LaborwertForm`.
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET/POST | `/health/labs/` | Liste (gruppiert nach Laborwert, `?name=`), Messung anlegen |
+| GET/PATCH/DELETE | `/health/labs/<id>/` | Messung |
+| GET | `/health/labs/trend/?name=` | Verlauf mit Referenzgrenzen |
+| POST | `/health/checks/<id>/labs/` | Messung am Arztbesuch erfassen |
+| GET | `/health/labs/analysis/` | letzte KI-Einordnung (nur lesen) |
+
+Die KI-Einordnung ist in Stufe 1 ausgenommen. Im Web ist sie bestätigungspflichtig: Der angezeigte Text trägt eine Prüfsumme (`pruefsumme` in `health/services/laboranalyse.py`) und wird nur erzeugt, wenn der Nutzer genau diesen Stand bestätigt. Wird sie später aufgenommen, muss die API dieselbe Prüfsumme verlangen, sonst fehlt die Bestätigung.
 
 **Training und Ampel** (`Training`, `TrainingVorlage`, `TrainingWochenziel`): `/health/trainings/`,
-`/health/trainings/<id>/`, `/health/training-templates/`, `/health/training-goal/`,
+`/health/trainings/<id>/`, `/health/training-templates/`, `/health/training-goals/` (Wochenziele **je Sportart**, seit 0.93.1055; ein Ziel ohne Sportart gilt für alle; Liste, anlegen, ändern, löschen, Validierung über `WochenzielZeileForm`),
 `/health/training/review/` (Rückblick) und `/health/traffic-light/` (Ampel, nur lesen). Beratungstexte
 (`Ernaehrungsrat`, `Trainingsrat`) sind KI-gestützt und entfallen in Stufe 1.
 
@@ -322,5 +332,6 @@ Am 2026-10-21 abgestimmt:
 4. **Health nicht aktiviert:** Die App zeigt einen Aktivierungshinweis und bietet `/health/profile/enable/` an.
 5. **Client:** Kotlin mit Jetpack Compose (nur Android).
 
-Noch offen: keine fachlichen Fragen. Vor Phase 0 ist zu klären, auf welchem Branch im
-HomeCenter-Repo die API entwickelt wird.
+6. **Branch:** `feature/mobile-api`, abgezweigt von `release/0.93` (21.10.2026).
+
+Noch offen: keine fachlichen Fragen. Phase 0 ist begonnen.
