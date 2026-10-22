@@ -151,6 +151,47 @@ class ApiClient(
     /** Legt eine Kategorie an; gibt es sie schon, kommt die vorhandene zurück. */
     suspend fun createRecipeCategory(name: String): RecipeCategory = post("recipe-categories/", obj("name" to name))
 
+    // ── OweMe ───────────────────────────────────────────────────────────
+
+    suspend fun oweMe(): OweMeOverview = get("oweme/")
+
+    /** Neues Konto: `direction` und `person_name` sind Pflicht. Liefert das Konto mit leerem Auszug. */
+    suspend fun createOweMeAccount(patch: OweMeAccountPatch): OweMeAccountDetail = konto(anfrage("POST", "oweme/accounts/", patch.alsJson()))
+
+    suspend fun oweMeAccount(key: String): OweMeAccountDetail = konto(anfrage("GET", "oweme/accounts/$key/", null))
+
+    /** Nur der Besitzer; sonst 403 `forbidden`. */
+    suspend fun updateOweMeAccount(key: String, patch: OweMeAccountPatch): OweMeAccountDetail =
+        konto(anfrage("PATCH", "oweme/accounts/$key/", patch.alsJson()))
+
+    suspend fun deleteOweMeAccount(key: String) = ohneAntwort("DELETE", "oweme/accounts/$key/")
+
+    /** [kind] ist [OweMeKind.GIVEN] oder [OweMeKind.RETURNED]; `date`, `title` und `amount` müssen gesetzt sein. */
+    suspend fun addOweMeEntry(key: String, kind: String, patch: OweMeEntryPatch): OweMeEntryResult =
+        post("oweme/accounts/$key/entries/$kind/", patch.alsJson())
+
+    suspend fun updateOweMeEntry(id: Long, patch: OweMeEntryPatch): OweMeEntryResult = send("PATCH", "oweme/entries/$id/", patch.alsJson())
+
+    /** Löscht die Bewegung und liefert den neuen Kontostand. */
+    suspend fun deleteOweMeEntry(id: Long): OweMeBalance = antwort(anfrage("DELETE", "oweme/entries/$id/", null))
+
+    /** Legt den Rückzahlungsplan an oder ersetzt ihn. */
+    suspend fun setOweMePlan(key: String, plan: OweMePlanInput): OweMeAccountDetail =
+        konto(anfrage("PUT", "oweme/accounts/$key/plan/", plan.alsJson()))
+
+    suspend fun deleteOweMePlan(key: String) = ohneAntwort("DELETE", "oweme/accounts/$key/plan/")
+
+    /** Das Konto steht auf oberster Ebene der Antwort, Auszug und Plan daneben: beides aus demselben Text lesen. */
+    private suspend fun konto(request: Request): OweMeAccountDetail {
+        val (status, text) = ausfuehren(request)
+        return try {
+            val teil = JSON.decodeFromString<OweMeDetailTeil>(text)
+            OweMeAccountDetail(JSON.decodeFromString<OweMeAccount>(text), teil.entries, teil.plan)
+        } catch (e: Exception) {
+            throw ApiException(ApiException.BAD_RESPONSE, "Unerwartete Antwort der Instanz.", status, cause = e)
+        }
+    }
+
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {
             add("limit" to limit.toString())

@@ -15,20 +15,32 @@ object FeldFehler {
         "store" to "Geschäft", "shopping_category" to "Kategorie", "price" to "Preis",
         "text" to "Text", "heading" to "Überschrift", "image" to "Bild", "caption" to "Bildunterschrift",
         "target_list_key" to "Liste", "new_list_title" to "Name der neuen Liste",
+        // OweMe
+        "person_name" to "Name", "direction" to "Richtung", "due_date" to "Zurück bis", "date" to "Datum",
+        "mode" to "Weg", "start" to "Erste Rate", "interval" to "Rhythmus", "rate" to "Betrag je Rate",
+        "count" to "Anzahl der Raten", "end" to "Letzte Rate", "rates" to "Raten",
     )
-    private val BEREICHE = mapOf("ingredients" to "Zutat", "steps" to "Schritt", "items" to "Artikel")
-    private val LISTENFELD = Regex("""^(ingredients|steps|items)\[(\d+)]\.?(.*)$""")
+    /** Beschriftungen, die in OweMe anders lauten als bei Rezepten (`amount`: Menge ↔ Betrag, `note`: Hinweis ↔ Notiz). */
+    val OWEME: Map<String, String> = mapOf("title" to "Titel", "amount" to "Betrag", "note" to "Notiz")
 
-    /** Eine Zeile je Meldung; Reihenfolge wie vom Server. */
-    fun meldungen(fields: Map<String, List<String>>): List<String> = fields.flatMap { (schluessel, texte) ->
+    private val BEREICHE = mapOf("ingredients" to "Zutat", "steps" to "Schritt", "items" to "Artikel", "rates" to "Rate")
+    private val LISTENFELD = Regex("""^(ingredients|steps|items|rates)\[(\d+)]\.?(.*)$""")
+
+    /**
+     * Eine Zeile je Meldung; Reihenfolge wie vom Server. [beschriftung] überschreibt Feldnamen für einen Bereich,
+     * in dem sie anders heißen (z. B. [OWEME]).
+     */
+    fun meldungen(fields: Map<String, List<String>>, beschriftung: Map<String, String> = emptyMap()): List<String> = fields.flatMap { (schluessel, texte) ->
+        fun name(feld: String) = beschriftung[feld] ?: FELDER[feld] ?: feld
         val treffer = LISTENFELD.matchEntire(schluessel)
         val kopf = if (treffer != null) {
             val (bereich, index, feld) = treffer.destructured
             val ort = "${BEREICHE.getValue(bereich)} ${index.toInt() + 1}"
-            if (feld.isEmpty()) ort else "$ort – ${FELDER[feld] ?: feld}"
+            if (feld.isEmpty()) ort else "$ort – ${name(feld)}"
         } else {
-            FELDER[schluessel] ?: schluessel
+            name(schluessel)
         }
-        texte.map { "$kopf: $it" }
+        // „non_field“ sind Fehler, die zu keinem einzelnen Feld gehören: nur der Text.
+        if (schluessel == "non_field") texte else texte.map { "$kopf: $it" }
     }
 }
