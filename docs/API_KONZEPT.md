@@ -345,3 +345,29 @@ Noch offen: keine fachlichen Fragen. Phase 0 ist begonnen.
      vorhandene Social-API das App-Token an; für Freunde, Profile und Chat-Liste neue JSON-Endpunkte als eigene Phase.
    - Unabhängig davon: Wegen Basic Auth ist `/api/social/` auf öffentlichen Instanzen ohne Sperre nach Fehlversuchen
      erreichbar; in `settings/base.py` lässt sich Basic aus den DRF-Einstellungen nehmen oder drosseln.
+
+## 11. Ergänzung für Phase 5: Lebensmittelsuche im Kalorientracker (offen)
+
+Der Kalorientracker des Webs schlägt beim Tippen Lebensmittel aus dem Bundeslebensmittelschlüssel (BLS 4.0, rund 7.100
+Einträge in `tools/data/bls_4_0.csv`, Tabelle `tools.BlsFood`) vor und rechnet mit dem Portionsrechner aus „Werte je 100 g“
+und „gegessene Gramm“ die Werte der Portion aus. Der **Rechner** läuft komplett in der App (Rundung wie im Web: kcal auf ganze
+Zahlen, Nährwerte auf eine Nachkommastelle; Eiweiß und Fett nur zusammen). Die **Vorschläge** brauchen einen Endpunkt, den
+die mobile API noch nicht hat: der Web-Endpunkt `tools/api/lebensmittel/bls/suggest/` kennt nur Session und CSRF, nicht das
+App-Token.
+
+Gewünscht (Phase 5b):
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET | `/health/foods/?q=<Text>` | Vorschläge, höchstens acht, ab zwei Zeichen |
+
+- Antwort wie im Web: `{"suggestions": [{"code", "name", "kcal_100g", "protein_100g", "fat_100g", "carbs_100g"}]}`;
+  `protein_100g`, `fat_100g`, `carbs_100g` sind Zahlen oder `null` (fehlt im Schlüssel; `null` ist nicht 0).
+- Umsetzung: `tools.services.bls.suche(q)` aufrufen (Normalisierung und Rangfolge bleiben auf dem Server, die App dupliziert
+  nichts). Berechtigung `AppEnabled('health')`. Wie im Web immer 200, bei kurzer Eingabe oder ohne Treffer eine leere Liste.
+- Die App zeigt die Quelle „Bundeslebensmittelschlüssel 4.0 · Max Rubner-Institut“ unter den Vorschlägen. Ohne den Endpunkt
+  (404) zeigt sie einfach keine Vorschläge; der Rechner funktioniert trotzdem.
+- Alternative ohne Server-Änderung: die CSV (rund 450 KB, laut BLS-Dokumentation frei auch für App-Entwicklung) in die App
+  einbauen und dort durchsuchen. Das verdoppelt die Suchlogik, hält die Daten außerhalb der Instanz und funktioniert offline;
+  empfohlen wird es nicht.
+

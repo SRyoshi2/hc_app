@@ -16,6 +16,15 @@ import de.sryoshi.hcapp.core.Compatibility
 import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
+import de.sryoshi.hcapp.core.WeightEntry
+import de.sryoshi.hcapp.core.MealTemplatePatch
+import de.sryoshi.hcapp.core.MealTemplate
+import de.sryoshi.hcapp.core.HealthProfilePatch
+import de.sryoshi.hcapp.core.HealthProfile
+import de.sryoshi.hcapp.core.FoodSuggestion
+import de.sryoshi.hcapp.core.CalorieMonth
+import de.sryoshi.hcapp.core.CalorieEntryPatch
+import de.sryoshi.hcapp.core.CalorieDay
 import de.sryoshi.hcapp.core.Me
 import de.sryoshi.hcapp.core.OweMePlanInput
 import de.sryoshi.hcapp.core.OweMeOverview
@@ -35,6 +44,7 @@ import de.sryoshi.hcapp.data.InstanceStore
 import de.sryoshi.hcapp.ui.RezeptEntwurf
 import de.sryoshi.hcapp.ui.htmlZuKlartext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
@@ -54,6 +64,13 @@ sealed interface Screen {
     data class OweMeUebersicht(val instance: Instance, val me: Me) : Screen
     data class OweMeKonto(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
     data class OweMeRatenplan(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
+    data class Health(val instance: Instance, val me: Me) : Screen
+    /** [date] als `JJJJ-MM-TT`. */
+    data class HealthDay(val instance: Instance, val me: Me, val date: String) : Screen
+    /** [month] als `JJJJ-MM`. */
+    data class HealthMonth(val instance: Instance, val me: Me, val month: String) : Screen
+    data class HealthWeight(val instance: Instance, val me: Me) : Screen
+    data class HealthTemplates(val instance: Instance, val me: Me) : Screen
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -93,6 +110,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var kategorien by mutableStateOf<List<RecipeCategory>>(emptyList())
         private set
 
+    var healthProfil by mutableStateOf<HealthProfile?>(null)
+        private set
+    /** Der heutige Tag für die Health-Übersicht. */
+    var healthHeute by mutableStateOf<CalorieDay?>(null)
+        private set
+    var kalorienTag by mutableStateOf<CalorieDay?>(null)
+        private set
+    var kalorienMonat by mutableStateOf<CalorieMonth?>(null)
+        private set
+    var gewichte by mutableStateOf<List<WeightEntry>>(emptyList())
+        private set
+    var vorlagen by mutableStateOf<List<MealTemplate>>(emptyList())
+        private set
+    /** Vorschläge aus dem Lebensmittelschlüssel zur aktuellen Eingabe. */
+    var foods by mutableStateOf<List<FoodSuggestion>>(emptyList())
+        private set
+    private var foodJob: Job? = null
+
     var oweMe by mutableStateOf<OweMeOverview?>(null)
         private set
     var konto by mutableStateOf<OweMeAccountDetail?>(null)
@@ -112,6 +147,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.Recipes -> Screen.Home(s.instance, s.me)
                 is Screen.Recipe -> Screen.Recipes(s.instance, s.me)
                 is Screen.RecipeShopping -> Screen.Recipe(s.instance, s.me, s.key, s.title)
+                is Screen.Health -> Screen.Home(s.instance, s.me)
+                is Screen.HealthDay -> Screen.Health(s.instance, s.me)
+                is Screen.HealthMonth -> Screen.Health(s.instance, s.me)
+                is Screen.HealthWeight -> Screen.Health(s.instance, s.me)
+                is Screen.HealthTemplates -> Screen.Health(s.instance, s.me)
                 is Screen.OweMeUebersicht -> Screen.Home(s.instance, s.me)
                 is Screen.OweMeKonto -> Screen.OweMeUebersicht(s.instance, s.me)
                 is Screen.OweMeRatenplan -> Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
@@ -161,6 +201,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Mit den Feldern des Servers („Titel: Dieses Feld ist erforderlich.“) statt nur „Die Eingaben sind nicht gültig.“
         "validation_error" -> FeldFehler.meldungen(e.fields, beschriftung()).joinToString("\n").ifBlank { e.message }
         "forbidden" -> "Das darf nur der Besitzer."
+        "health_not_enabled" -> "Health ist für dein Konto noch nicht eingeschaltet."
         else -> e.message
     }
 
@@ -436,5 +477,127 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         api.deleteOweMePlan(s.key)
         konto = api.oweMeAccount(s.key)
         screen = Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
+    }
+    // ── Health ──────────────────────────────────────────────────────────
+
+    private fun heute(): String = java.time.LocalDate.now().toString()
+
+    /** Profil laden; ist Health eingeschaltet, dazu der heutige Tag für die Übersicht. */
+    fun loadHealth(s: Screen.Health) = run(s.instance) {
+        val api = client(s.instance)
+        val profil = api.healthProfile()
+        healthProfil = profil
+        healthHeute = if (profil.enabled) api.calorieDay(heute()) else null
+    }
+
+    /** Stammdaten speichern, erstes Gewicht erfassen und Health einschalten. */
+    fun setupHealth(s: Screen.Health, patch: HealthProfilePatch, gewichtKg: String) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateHealthProfile(patch)
+        api.addWeight(gewichtKg)
+        val profil = api.setHealthEnabled(true)
+        healthProfil = profil
+        healthHeute = if (profil.enabled) api.calorieDay(heute()) else null
+    }
+
+    fun loadDay(s: Screen.HealthDay) {
+        if (kalorienTag?.date != s.date) kalorienTag = null
+        run(s.instance) { kalorienTag = client(s.instance).calorieDay(s.date) }
+    }
+
+    fun loadMonth(s: Screen.HealthMonth) = run(s.instance) { kalorienMonat = client(s.instance).calorieMonth(s.month) }
+
+    fun addCalorieEntry(s: Screen.HealthDay, patch: CalorieEntryPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.addCalorieEntry(s.date, patch)
+        kalorienTag = api.calorieDay(s.date)
+    }
+
+    fun updateCalorieEntry(s: Screen.HealthDay, id: Long, patch: CalorieEntryPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateCalorieEntry(id, patch)
+        kalorienTag = api.calorieDay(s.date)
+    }
+
+    fun deleteCalorieEntry(s: Screen.HealthDay, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteCalorieEntry(id)
+        kalorienTag = api.calorieDay(s.date)
+    }
+
+    fun applyMealTemplate(s: Screen.HealthDay, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.applyMealTemplate(id, s.date)
+        kalorienTag = api.calorieDay(s.date)
+    }
+
+    fun loadTemplates(instance: Instance) = run(instance) { vorlagen = client(instance).mealTemplates().results }
+
+    fun createMealTemplate(s: Screen.HealthTemplates, patch: MealTemplatePatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.createMealTemplate(patch)
+        vorlagen = api.mealTemplates().results
+    }
+
+    fun updateMealTemplate(s: Screen.HealthTemplates, id: Long, patch: MealTemplatePatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateMealTemplate(id, patch)
+        vorlagen = api.mealTemplates().results
+    }
+
+    fun deleteMealTemplate(s: Screen.HealthTemplates, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteMealTemplate(id)
+        vorlagen = api.mealTemplates().results
+    }
+
+    fun loadWeights(s: Screen.HealthWeight) = run(s.instance) {
+        val api = client(s.instance)
+        gewichte = api.weights().results
+        healthProfil = api.healthProfile()
+    }
+
+    fun addWeight(s: Screen.HealthWeight, kg: String, date: String?) = run(s.instance) {
+        val api = client(s.instance)
+        api.addWeight(kg, date)
+        gewichte = api.weights().results
+        healthProfil = api.healthProfile()
+    }
+
+    fun deleteWeight(s: Screen.HealthWeight, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteWeight(id)
+        gewichte = api.weights().results
+        healthProfil = api.healthProfile()
+    }
+
+    /** Zielgewicht und -datum ändern (`null` entfernt das Ziel). */
+    fun updateHealthGoal(s: Screen.HealthWeight, patch: HealthProfilePatch) = run(s.instance) {
+        val api = client(s.instance)
+        healthProfil = api.updateHealthProfile(patch)
+    }
+
+    /**
+     * Vorschläge zur Eingabe im Titelfeld. Kein Fortschrittsbalken, keine Fehlermeldung: wie im Web heißt jede Störung
+     * (auch ein Server ohne diese Suche) einfach „keine Vorschläge“. Die jüngste Anfrage gewinnt.
+     */
+    fun searchFoods(s: Screen.HealthDay, text: String) {
+        foodJob?.cancel()
+        if (text.trim().length < 2) {
+            foods = emptyList()
+            return
+        }
+        foodJob = viewModelScope.launch {
+            foods = try {
+                client(s.instance).searchFoods(text)
+            } catch (e: ApiException) {
+                emptyList()
+            }
+        }
+    }
+
+    fun clearFoods() {
+        foodJob?.cancel()
+        foods = emptyList()
     }
 }

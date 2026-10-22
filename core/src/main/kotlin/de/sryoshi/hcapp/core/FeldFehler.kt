@@ -19,6 +19,11 @@ object FeldFehler {
         "person_name" to "Name", "direction" to "Richtung", "due_date" to "Zurück bis", "date" to "Datum",
         "mode" to "Weg", "start" to "Erste Rate", "interval" to "Rhythmus", "rate" to "Betrag je Rate",
         "count" to "Anzahl der Raten", "end" to "Letzte Rate", "rates" to "Raten",
+        // Health
+        "birth_date" to "Geburtsdatum", "height_cm" to "Körpergröße", "sex" to "Geschlecht", "activity" to "Aktivitätsgrad",
+        "target_weight_kg" to "Zielgewicht", "target_date" to "Ziel bis", "weight_kg" to "Gewicht",
+        "kcal_per_serving" to "kcal je Portion", "month" to "Monat", "enabled" to "Health",
+        "training_enabled" to "Training",
     )
     /** Beschriftungen, die in OweMe anders lauten als bei Rezepten (`amount`: Menge ↔ Betrag, `note`: Hinweis ↔ Notiz). */
     val OWEME: Map<String, String> = mapOf("title" to "Titel", "amount" to "Betrag", "note" to "Notiz")
