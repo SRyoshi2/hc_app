@@ -192,6 +192,63 @@ class ApiClient(
         }
     }
 
+    // ── Health ──────────────────────────────────────────────────────────
+
+    suspend fun healthProfile(): HealthProfile = get("health/profile/")
+
+    suspend fun updateHealthProfile(patch: HealthProfilePatch): HealthProfile = send("PATCH", "health/profile/", patch.alsJson())
+
+    /** Schaltet Health ein oder aus. Einschalten braucht vollständige Stammdaten und ein Gewicht (sonst `profile_incomplete`). */
+    suspend fun setHealthEnabled(enabled: Boolean): HealthProfile =
+        post("health/profile/enable/", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
+
+    suspend fun weights(limit: Int = 200, offset: Int = 0): Page<WeightEntry> =
+        get("health/weights/", "limit" to limit.toString(), "offset" to offset.toString())
+
+    /** Erneutes Wiegen am selben Tag ersetzt den Wert. [date] `null` = heute (Server). */
+    suspend fun addWeight(kg: String, date: String? = null): WeightEntry =
+        post("health/weights/", JsonObject(buildMap<String, JsonElement> {
+            put("weight_kg", JsonPrimitive(kg))
+            date?.let { put("date", JsonPrimitive(it)) }
+        }))
+
+    suspend fun deleteWeight(id: Long) = ohneAntwort("DELETE", "health/weights/$id/")
+
+    /** [month] als `JJJJ-MM`; `null` = laufender Monat. */
+    suspend fun calorieMonth(month: String? = null): CalorieMonth =
+        get("health/calories/", *(if (month == null) emptyArray<Pair<String, String>>() else arrayOf("month" to month)))
+
+    suspend fun calorieDay(date: String): CalorieDay = get("health/calories/$date/")
+
+    suspend fun addCalorieEntry(date: String, patch: CalorieEntryPatch): CalorieEntry =
+        post("health/calories/$date/entries/", patch.alsJson())
+
+    suspend fun updateCalorieEntry(id: Long, patch: CalorieEntryPatch): CalorieEntry =
+        send("PATCH", "health/calorie-entries/$id/", patch.alsJson())
+
+    suspend fun deleteCalorieEntry(id: Long) = ohneAntwort("DELETE", "health/calorie-entries/$id/")
+
+    suspend fun mealTemplates(): Page<MealTemplate> = get("health/meal-templates/", "limit" to "200")
+
+    suspend fun createMealTemplate(patch: MealTemplatePatch): MealTemplate = post("health/meal-templates/", patch.alsJson())
+
+    suspend fun updateMealTemplate(id: Long, patch: MealTemplatePatch): MealTemplate =
+        send("PATCH", "health/meal-templates/$id/", patch.alsJson())
+
+    suspend fun deleteMealTemplate(id: Long) = ohneAntwort("DELETE", "health/meal-templates/$id/")
+
+    /** Die Vorlage als Eintrag für den Tag übernehmen (eine Kopie). */
+    suspend fun applyMealTemplate(id: Long, date: String): CalorieEntry =
+        post("health/meal-templates/$id/apply/$date/", null)
+
+    /**
+     * Vorschläge aus dem Bundeslebensmittelschlüssel während der Eingabe (höchstens acht, ab zwei Zeichen).
+     * Setzt den Endpunkt `GET /api/v1/health/foods/?q=` voraus (siehe docs/API_KONZEPT.md); gibt es ihn auf der
+     * Instanz nicht, wirft der Aufruf eine [ApiException] – der Aufrufer zeigt dann einfach keine Vorschläge.
+     */
+    suspend fun searchFoods(q: String): List<FoodSuggestion> =
+        get<FoodSuggestions>("health/foods/", "q" to q.trim()).suggestions
+
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {
             add("limit" to limit.toString())
