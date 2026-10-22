@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 
 /**
- * Die Farben der Web-App (`home/static/css/hc_theme.css`, OweMe: `oweme/templates/oweme/*.html`),
+ * Die Farben der Web-App (`home/static/css/hc_theme.css`, OweMe: die Vorlagen im Ordner `oweme/templates/oweme`),
  * Hell und Dunkel. Die Farben der einzelnen Apps sind final; Flächen und Text folgen dem Web-Design
  * und können sich dort noch ändern – dann hier nachziehen.
  */
