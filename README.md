@@ -29,6 +29,22 @@ Entwicklungsumgebung, in der der Code entstand, erreicht Maven Central und Googl
 Das Modul `app` wird nur eingebunden, wenn ein Android SDK gefunden wird (`ANDROID_HOME`,
 `ANDROID_SDK_ROOT` oder `local.properties`); sonst lässt sich `core` allein bauen.
 
+## Design
+
+Die Farben folgen der Web-App (`home/static/css/hc_theme.css`, OweMe-Vorlagen), Hell und Dunkel nach
+Systemeinstellung. Umgesetzt in `app/.../ui/theme/HcTheme.kt`:
+
+| Welt | Farbe | Apps |
+|---|---|---|
+| Küche | Grün `#2e7d4f` (dunkel `#57b57c`) | Einkaufsliste, Rezepte |
+| Health | Petrol `#0f766e` / Kopf `#0f3b36` (dunkel `#2dd4bf` / `#16302c`) | Health |
+| OweMe | Petrol-Kopf `#123a36`, „bekomme“ `#1f7a6e`, „schulde“ `#b0762a` | OweMe |
+| HomeCenter | Rot `#dc3545` | Instanzen, Anmeldung, Startseite |
+
+Artikel tragen eine Kante in einer der neun Kategoriefarben (`--hc-cat-1..9`). Das Web verteilt sie per
+Hash auf den Namen; der Hash der App ist nicht derselbe, dieselbe Kategorie kann daher eine andere Farbe haben.
+Ändern sich im Web die Farben, `HcTheme.kt` nachziehen.
+
 ## Sicherheitsregeln
 
 - `https://` ist Standard. `http://` nimmt die App nur für lokale Adressen an

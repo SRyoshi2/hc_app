@@ -2,6 +2,7 @@ package de.sryoshi.hcapp
 
 import android.app.Application
 import android.os.Build
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +20,7 @@ import de.sryoshi.hcapp.core.ShoppingItem
 import de.sryoshi.hcapp.core.ShoppingList
 import de.sryoshi.hcapp.data.Instance
 import de.sryoshi.hcapp.data.InstanceStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
@@ -78,6 +80,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 error = e.message
             } catch (e: ApiException) {
                 if (instance != null && e.tokenUngueltig) abgelaufen(instance) else error = text(e)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Auffangnetz: ein unerwarteter Fehler soll eine Meldung zeigen, nicht die App beenden.
+                Log.e("HcApp", "Unerwarteter Fehler", e)
+                error = "Unerwarteter Fehler: ${e.javaClass.simpleName}: ${e.message}"
             } finally {
                 busy = false
             }

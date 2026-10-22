@@ -16,7 +16,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -93,18 +92,17 @@ class ApiClient(
         antwort(anfrage(methode, pfad, body))
 
     private suspend fun ohneAntwort(methode: String, pfad: String) {
-        ausfuehren(anfrage(methode, pfad, null)).use { }
+        ausfuehren(anfrage(methode, pfad, null))
     }
 
-    private suspend inline fun <reified T> antwort(request: Request): T =
-        ausfuehren(request).use { r ->
-            val text = r.body?.string().orEmpty()
-            try {
-                JSON.decodeFromString<T>(text)
-            } catch (e: Exception) {
-                throw ApiException(ApiException.BAD_RESPONSE, "Unerwartete Antwort der Instanz.", r.code, cause = e)
-            }
+    private suspend inline fun <reified T> antwort(request: Request): T {
+        val (status, text) = ausfuehren(request)
+        return try {
+            JSON.decodeFromString<T>(text)
+        } catch (e: Exception) {
+            throw ApiException(ApiException.BAD_RESPONSE, "Unerwartete Antwort der Instanz.", status, cause = e)
         }
+    }
 
     private fun anfrage(
         methode: String,
@@ -127,19 +125,24 @@ class ApiClient(
             .build()
     }
 
-    /** Führt aus und wandelt Fehlerantworten in [ApiException]; die Antwort muss der Aufrufer schließen. */
-    private suspend fun ausfuehren(request: Request): Response = withContext(Dispatchers.IO) {
-        val r = try {
-            http.newCall(request).execute()
+    /**
+     * Führt die Anfrage aus und liest den Antworttext **vollständig im IO-Kontext**: Wer den Text erst
+     * später liest, tut es auf dem Aufrufer-Thread, und Android wirft dort bei Netzwerkzugriff eine
+     * `NetworkOnMainThreadException`. Fehlerantworten werden zu [ApiException]. Ergebnis: Status und Text.
+     */
+    private suspend fun ausfuehren(request: Request): Pair<Int, String> = withContext(Dispatchers.IO) {
+        try {
+            http.newCall(request).execute().use { r ->
+                val text = r.body?.string().orEmpty()
+                if (!r.isSuccessful) throw fehler(r.code, text)
+                r.code to text
+            }
         } catch (e: IOException) {
             throw ApiException(ApiException.NETWORK, "Die Instanz ist nicht erreichbar.", cause = e)
         }
-        if (r.isSuccessful) return@withContext r
-        r.use { throw fehler(it) }
     }
 
-    private fun fehler(r: Response): ApiException {
-        val text = r.body?.string().orEmpty()
+    private fun fehler(status: Int, text: String): ApiException {
         val fehler = runCatching { JSON.parseToJsonElement(text).jsonObject["error"]?.jsonObject }.getOrNull()
         if (fehler != null) {
             val felder = fehler["fields"]?.let { f ->
@@ -149,16 +152,16 @@ class ApiClient(
             }.orEmpty()
             return ApiException(
                 code = fehler["code"]?.jsonPrimitive?.contentOrNull ?: "error",
-                message = fehler["message"]?.jsonPrimitive?.contentOrNull ?: "Fehler ${r.code}",
-                httpStatus = r.code,
+                message = fehler["message"]?.jsonPrimitive?.contentOrNull ?: "Fehler $status",
+                httpStatus = status,
                 fields = felder,
             )
         }
         // Keine JSON-Fehlerantwort: bei 404 gibt es die API auf dieser Instanz nicht (zu alter Stand oder falsche Adresse).
-        return if (r.code == 404) {
+        return if (status == 404) {
             ApiException(ApiException.NO_API, "Diese Instanz unterstützt die App noch nicht.", 404)
         } else {
-            ApiException("http_${r.code}", "Unerwartete Antwort der Instanz (${r.code}).", r.code)
+            ApiException("http_$status", "Unerwartete Antwort der Instanz ($status).", status)
         }
     }
 

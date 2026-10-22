@@ -1,25 +1,39 @@
 package de.sryoshi.hcapp.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +57,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
@@ -52,6 +69,11 @@ import de.sryoshi.hcapp.core.AppKey
 import de.sryoshi.hcapp.core.ShoppingItem
 import de.sryoshi.hcapp.core.ShoppingList
 import de.sryoshi.hcapp.data.Instance
+import de.sryoshi.hcapp.ui.theme.Hc
+import de.sryoshi.hcapp.ui.theme.Welt
+import de.sryoshi.hcapp.ui.theme.akzent
+import de.sryoshi.hcapp.ui.theme.kategorieFarbe
+import de.sryoshi.hcapp.ui.theme.kopf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,19 +87,29 @@ fun HcApp(vm: AppViewModel) {
         is Screen.Lists -> "Einkaufslisten"
         is Screen.Items -> s.title
     }
+    val welt = when (s) {
+        is Screen.Lists, is Screen.Items -> Welt.KUECHE
+        else -> Welt.HOMECENTER
+    }
+    val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
     val zurueck = s !is Screen.Instances && !(s is Screen.AddInstance && vm.instances.isEmpty())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(titel) },
+                title = { Text(titel, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     if (zurueck) {
                         IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = kopfFarbe, titleContentColor = kopfText,
+                    navigationIconContentColor = kopfText, actionIconContentColor = kopfText,
+                ),
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (s) {
@@ -90,6 +122,20 @@ fun HcApp(vm: AppViewModel) {
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
+    }
+}
+
+/** Karte wie im Web: Kartenfläche, 1 px Linie, abgerundet. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HcKarte(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    val farben = CardDefaults.cardColors(containerColor = Hc.farben.card)
+    val rand = BorderStroke(1.dp, Hc.farben.line)
+    val form = RoundedCornerShape(14.dp)
+    if (onClick != null) {
+        Card(onClick = onClick, modifier = modifier, shape = form, colors = farben, border = rand, content = content)
+    } else {
+        Card(modifier = modifier, shape = form, colors = farben, border = rand, content = content)
     }
 }
 
@@ -116,12 +162,12 @@ private fun InstancesScreen(vm: AppViewModel) {
 @Composable
 private fun InstanceCard(vm: AppViewModel, i: Instance) {
     var abmelden by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().clickable { vm.open(i) }) {
+    HcKarte(Modifier.fillMaxWidth(), onClick = { vm.open(i) }) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(i.name, style = MaterialTheme.typography.titleMedium)
-                Text(i.url, style = MaterialTheme.typography.bodySmall)
-                Text("Angemeldet als ${i.displayName}", style = MaterialTheme.typography.bodySmall)
+                Text(i.url, style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+                Text("Angemeldet als ${i.displayName}", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
             }
             TextButton(onClick = { abmelden = true }) { Text("Entfernen") }
         }
@@ -159,7 +205,7 @@ private fun LoginScreen(vm: AppViewModel, s: Screen.Login) {
     var benutzer by rememberSaveable { mutableStateOf(s.username) }
     var passwort by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("${s.meta.productName} · ${s.url}", style = MaterialTheme.typography.bodySmall)
+        Text("${s.meta.productName} · ${s.url}", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
         OutlinedTextField(
             value = benutzer, onValueChange = { benutzer = it; vm.clearError() },
             label = { Text("Benutzername") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -185,23 +231,32 @@ private fun HomeScreen(vm: AppViewModel, s: Screen.Home) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Hallo ${me.displayName}", style = MaterialTheme.typography.titleLarge)
         ErrorText(vm)
-        Kachel("Einkaufsliste", me.appAktiv(AppKey.SHOPPING), onClick = { vm.show(Screen.Lists(s.instance, me)) })
+        Kachel("Einkaufsliste", Icons.Default.ShoppingCart, Welt.KUECHE, me.appAktiv(AppKey.SHOPPING),
+            onClick = { vm.show(Screen.Lists(s.instance, me)) })
         // Die folgenden Bereiche folgen mit den nächsten Phasen der API.
-        Kachel("Rezepte", false, bald = me.appAktiv(AppKey.RECIPES))
-        Kachel("OweMe", false, bald = me.appAktiv(AppKey.OWEME))
-        Kachel("Health", false, bald = me.appAktiv(AppKey.HEALTH))
+        Kachel("Rezepte", Icons.Default.Restaurant, Welt.KUECHE, false, bald = me.appAktiv(AppKey.RECIPES))
+        Kachel("OweMe", Icons.Default.SwapHoriz, Welt.OWEME, false, bald = me.appAktiv(AppKey.OWEME))
+        Kachel("Health", Icons.Default.Favorite, Welt.HEALTH, false, bald = me.appAktiv(AppKey.HEALTH))
     }
 }
 
+/** App-Kachel in der Farbe ihrer Welt (Küche grün, Health petrol, OweMe petrol/ocker). */
 @Composable
-private fun Kachel(name: String, aktiv: Boolean, bald: Boolean = false, onClick: () -> Unit = {}) {
+private fun Kachel(name: String, symbol: ImageVector, welt: Welt, aktiv: Boolean, bald: Boolean = false, onClick: () -> Unit = {}) {
     // `bald`: auf der Instanz freigeschaltet, in der App aber noch nicht umgesetzt.
     // Nicht freigeschaltete Bereiche werden gar nicht erst angezeigt.
     if (!aktiv && !bald) return
-    Card(Modifier.fillMaxWidth().then(if (aktiv) Modifier.clickable(onClick = onClick) else Modifier)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(name, style = MaterialTheme.typography.titleMedium)
-            if (!aktiv) Text("Kommt bald", style = MaterialTheme.typography.bodySmall)
+    val farbe = Hc.farben.akzent(welt)
+    HcKarte(Modifier.fillMaxWidth(), onClick = if (aktiv) onClick else null) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).background(farbe.copy(alpha = if (aktiv) 0.14f else 0.07f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Icon(symbol, null, tint = if (aktiv) farbe else Hc.farben.muted) }
+            Column(Modifier.padding(start = 14.dp)) {
+                Text(name, style = MaterialTheme.typography.titleMedium, color = if (aktiv) Hc.farben.ink else Hc.farben.muted)
+                if (!aktiv) Text("Kommt bald", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+            }
         }
     }
 }
@@ -216,13 +271,13 @@ private fun ListsScreen(vm: AppViewModel, s: Screen.Lists) {
             ErrorText(vm)
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(vm.lists, key = { it.key }) { l ->
-                    Card(Modifier.fillMaxWidth().clickable { vm.show(Screen.Items(s.instance, s.me, l.key, l.title)) }) {
+                    HcKarte(Modifier.fillMaxWidth(), onClick = { vm.show(Screen.Items(s.instance, s.me, l.key, l.title)) }) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(l.title, style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     "${l.openCount} offen" + if (!l.isOwner) " · von ${l.owner}" else "",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
                                 )
                             }
                             if (l.isOwner) {
@@ -282,25 +337,33 @@ private fun ItemsScreen(vm: AppViewModel, s: Screen.Items) {
         ErrorText(vm)
         Spacer(Modifier.height(8.dp))
         // Offene Artikel zuerst, erledigte darunter.
-        LazyColumn {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(vm.items.sortedBy { it.done }, key = { it.id }) { a -> ArtikelZeile(vm, s, a) }
         }
     }
 }
 
+/** Artikelzeile mit Kante in der Kategoriefarbe (wie im Web: neun Töne, stabil je Kategoriename). */
 @Composable
 private fun ArtikelZeile(vm: AppViewModel, s: Screen.Items, a: ShoppingItem) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = a.done, onCheckedChange = { vm.toggle(s, a) })
-        Column(Modifier.weight(1f)) {
-            Text(
-                a.name,
-                textDecoration = if (a.done) TextDecoration.LineThrough else null,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            val zusatz = listOf(a.amount, a.category, a.store).filter { it.isNotBlank() }.joinToString(" · ")
-            if (zusatz.isNotEmpty()) Text(zusatz, style = MaterialTheme.typography.bodySmall)
+    val kante = Hc.farben.kategorieFarbe(a.category)
+    HcKarte(Modifier.fillMaxWidth()) {
+        Row(Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(5.dp).fillMaxHeight().background(if (a.done) Hc.farben.line else kante))
+            Checkbox(checked = a.done, onCheckedChange = { vm.toggle(s, a) })
+            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                Text(
+                    a.name,
+                    textDecoration = if (a.done) TextDecoration.LineThrough else null,
+                    color = if (a.done) Hc.farben.muted else Hc.farben.ink,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                val zusatz = listOf(a.amount, a.category, a.store).filter { it.isNotBlank() }.joinToString(" · ")
+                if (zusatz.isNotEmpty()) {
+                    Text(zusatz, style = MaterialTheme.typography.bodySmall, color = if (a.done) Hc.farben.muted else kante)
+                }
+            }
+            IconButton(onClick = { vm.deleteItem(s, a) }) { Icon(Icons.Default.Delete, "Artikel löschen", tint = Hc.farben.muted) }
         }
-        IconButton(onClick = { vm.deleteItem(s, a) }) { Icon(Icons.Default.Delete, "Artikel löschen") }
     }
 }
