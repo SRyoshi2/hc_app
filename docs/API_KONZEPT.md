@@ -335,3 +335,13 @@ Am 2026-10-21 abgestimmt:
 6. **Branch:** `feature/mobile-api`, abgezweigt von `release/0.93` (21.10.2026).
 
 Noch offen: keine fachlichen Fragen. Phase 0 ist begonnen.
+7. **Social:** vorerst nicht Teil der App (22.10.2026). Befund für später, Stand `feature/mobile-api` `ce13fd6`:
+   - Die vorhandene JSON-API unter `/api/social/` deckt Feed (cursorbasiert, Suche), Beitrag lesen/erstellen/ändern/löschen,
+     Liken und Kommentare ab; Chat-Nachrichten lesen/senden und „ungelesen“ liegen als JSON unter `social/api/chat/…`
+     (Zeit nur als `HH:MM`). Freundesliste, Anfragen, Profile, die Liste aller Chats und „Chat starten“ gibt es nur als HTML.
+   - Die Social-API kennt nur Session und HTTP Basic, nicht das App-Token. Ohne Server-Änderung blieben nur Basic
+     (Passwort auf dem Gerät, langsames Hashing bei jedem Aufruf, kein Widerruf) oder ein Session-Login mit CSRF.
+   - Empfehlung für später: `BearerTokenAuthentication` in die DRF-Standard-Authentifizierung aufnehmen, dann nimmt die
+     vorhandene Social-API das App-Token an; für Freunde, Profile und Chat-Liste neue JSON-Endpunkte als eigene Phase.
+   - Unabhängig davon: Wegen Basic Auth ist `/api/social/` auf öffentlichen Instanzen ohne Sperre nach Fehlversuchen
+     erreichbar; in `settings/base.py` lässt sich Basic aus den DRF-Einstellungen nehmen oder drosseln.
