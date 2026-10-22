@@ -56,6 +56,41 @@ Hash auf den Namen; der Hash der App ist nicht derselbe, dieselbe Kategorie kann
 - Tokens liegen verschlüsselt (AES-256-GCM, Schlüssel im Keystore), nie im Klartext.
 - Weiterleitungen folgt der Client nicht.
 
+## Release und Updates (fester Signaturschlüssel)
+
+Android installiert ein Update nur, wenn es mit demselben Schlüssel signiert ist wie die installierte App.
+Debug-Builds nutzen einen Schlüssel, der auf jedem Rechner anders ist; für Updates von jedem Rechner und von
+GitHub aus braucht es deshalb einen festen Release-Schlüssel. **Den erzeugen Sie selbst** und legen ihn nie ins
+Repository. Geht er verloren, lässt sich die App nie wieder aktualisieren, nur neu installieren: sichern Sie
+Datei und Passwörter an einem zweiten Ort.
+
+1. **Schlüssel erzeugen** (einmalig), im Terminal im Ordner, in dem die Datei liegen soll:
+   ```
+   keytool -genkeypair -v -keystore hc-release.jks -alias hc -keyalg RSA -keysize 4096 -validity 36500
+   ```
+   `keytool` liegt im JDK von Android Studio (`jbr/bin`). Oder in Android Studio:
+   `Build → Generate Signed App Bundle / APK… → APK → Create new…`.
+2. **Lokal bauen:** `keystore.properties.example` nach `keystore.properties` kopieren und ausfüllen (Pfad,
+   Passwörter, Alias), dann `./gradlew :app:assembleRelease`. Das APK liegt in `app/build/outputs/apk/release/`.
+3. **GitHub:** Unter *Settings → Secrets and variables → Actions* vier Secrets anlegen:
+   | Secret | Inhalt |
+   |---|---|
+   | `HC_KEYSTORE_BASE64` | die Schlüsseldatei als Base64-Text |
+   | `HC_KEYSTORE_PASSWORD` | Passwort der Schlüsseldatei |
+   | `HC_KEY_ALIAS` | Alias, im Beispiel `hc` |
+   | `HC_KEY_PASSWORD` | Passwort des Schlüssels |
+
+   Base64 erzeugen: PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("hc-release.jks")) | Set-Clipboard`,
+   Linux/macOS `base64 -w0 hc-release.jks`.
+4. **Veröffentlichen:** Ein Tag wie `v0.2.0` pushen. `.github/workflows/release.yml` führt die Tests aus, baut das
+   signierte APK und hängt es an ein GitHub-Release. Alternativ unter *Actions → Release-APK → Run workflow* manuell
+   starten; das APK liegt dann am Lauf zum Download. Die `versionCode` zählt GitHub je Lauf hoch.
+
+Eine per Android Studio installierte Debug-App trägt eine andere Signatur: **einmalig deinstallieren**, bevor das
+erste Release-APK installiert wird. Danach lassen sich Releases von jedem Rechner und von GitHub aus aktualisieren.
+Der SHA-256-Fingerabdruck des Zertifikats steht im Log des Schritts „APK prüfen und benennen" und muss bei jedem
+Release derselbe sein.
+
 ## Voraussetzung auf der Instanz
 
 Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 2).
