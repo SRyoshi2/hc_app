@@ -1,13 +1,17 @@
 package de.sryoshi.hcapp.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,6 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,10 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,12 +62,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import de.sryoshi.hcapp.R
 import de.sryoshi.hcapp.AppViewModel
 import de.sryoshi.hcapp.Screen
 import de.sryoshi.hcapp.core.AppKey
@@ -71,7 +81,6 @@ import de.sryoshi.hcapp.core.ShoppingList
 import de.sryoshi.hcapp.data.Instance
 import de.sryoshi.hcapp.ui.theme.Hc
 import de.sryoshi.hcapp.ui.theme.Welt
-import de.sryoshi.hcapp.ui.theme.akzent
 import de.sryoshi.hcapp.ui.theme.kategorieFarbe
 import de.sryoshi.hcapp.ui.theme.kopf
 
@@ -225,39 +234,123 @@ private fun LoginScreen(vm: AppViewModel, s: Screen.Login) {
     }
 }
 
+/** Eine App im App-Center: Name je Betriebsmodus, Symbol und ob die App schon umgesetzt ist. */
+private class AppEintrag(
+    val schluessel: String,
+    val titel: String,
+    val titelOffice: String,
+    @DrawableRes val symbol: Int,
+    val umgesetzt: Boolean,
+    val oeffnen: ((Screen.Home) -> Screen)? = null,
+)
+
+private val APPS = listOf(
+    AppEintrag(AppKey.SHOPPING, "Einkaufsliste", "Einkaufsliste", R.drawable.app_einkaufsliste, true) { Screen.Lists(it.instance, it.me) },
+    AppEintrag(AppKey.RECIPES, "Rezeptverwaltung", "Rezeptverwaltung", R.drawable.app_rezepte, false),
+    AppEintrag(AppKey.OWEME, "OweMe", "OweMe", R.drawable.app_oweme, false),
+    AppEintrag(AppKey.HEALTH, "Health", "Health", R.drawable.app_health, false),
+)
+
+/**
+ * Startseite wie das „App-Center“ im Web: Kopf mit Untertitel und Suche, Trennlinie „Standard-Apps“ mit
+ * Zähler, darunter Kacheln (Symbol in einer Karte, Name darunter), alphabetisch wie dort.
+ * Gezeigt werden nur Apps, die die Instanz für dieses Konto freigibt.
+ */
 @Composable
 private fun HomeScreen(vm: AppViewModel, s: Screen.Home) {
-    val me = s.me
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Hallo ${me.displayName}", style = MaterialTheme.typography.titleLarge)
-        ErrorText(vm)
-        Kachel("Einkaufsliste", Icons.Default.ShoppingCart, Welt.KUECHE, me.appAktiv(AppKey.SHOPPING),
-            onClick = { vm.show(Screen.Lists(s.instance, me)) })
-        // Die folgenden Bereiche folgen mit den nächsten Phasen der API.
-        Kachel("Rezepte", Icons.Default.Restaurant, Welt.KUECHE, false, bald = me.appAktiv(AppKey.RECIPES))
-        Kachel("OweMe", Icons.Default.SwapHoriz, Welt.OWEME, false, bald = me.appAktiv(AppKey.OWEME))
-        Kachel("Health", Icons.Default.Favorite, Welt.HEALTH, false, bald = me.appAktiv(AppKey.HEALTH))
+    var suche by rememberSaveable { mutableStateOf("") }
+    val office = s.instance.mode == "office"
+    val sichtbar = APPS
+        .filter { s.me.appAktiv(it.schluessel) }
+        .map { it to (if (office) it.titelOffice else it.titel) }
+        .sortedBy { it.second.lowercase() }
+    val treffer = sichtbar.filter { suche.isBlank() || it.second.lowercase().contains(suche.trim().lowercase()) }
+
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 88.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column {
+                    Text("App-Center", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Alle Anwendungen deiner ${s.instance.name}-Installation",
+                        style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
+                    )
+                }
+                OutlinedTextField(
+                    value = suche, onValueChange = { suche = it },
+                    placeholder = { Text("App suchen…") },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = Hc.farben.muted) },
+                    singleLine = true, shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ErrorText(vm)
+            }
+        }
+        if (treffer.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) { AbschnittKopf("Standard-Apps", treffer.size) }
+            items(treffer, key = { it.first.schluessel }) { (app, name) ->
+                AppKachel(name, app.symbol, app.umgesetzt) { app.oeffnen?.let { vm.show(it(s)) } }
+            }
+        } else {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    if (sichtbar.isEmpty()) "Für dieses Konto sind keine Apps freigeschaltet." else "Keine App gefunden.",
+                    color = Hc.farben.muted, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                )
+            }
+        }
     }
 }
 
-/** App-Kachel in der Farbe ihrer Welt (Küche grün, Health petrol, OweMe petrol/ocker). */
+/** Trennlinie mit Bezeichnung und Zähler-Chip (`.app-section`). */
 @Composable
-private fun Kachel(name: String, symbol: ImageVector, welt: Welt, aktiv: Boolean, bald: Boolean = false, onClick: () -> Unit = {}) {
-    // `bald`: auf der Instanz freigeschaltet, in der App aber noch nicht umgesetzt.
-    // Nicht freigeschaltete Bereiche werden gar nicht erst angezeigt.
-    if (!aktiv && !bald) return
-    val farbe = Hc.farben.akzent(welt)
-    HcKarte(Modifier.fillMaxWidth(), onClick = if (aktiv) onClick else null) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).background(farbe.copy(alpha = if (aktiv) 0.14f else 0.07f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) { Icon(symbol, null, tint = if (aktiv) farbe else Hc.farben.muted) }
-            Column(Modifier.padding(start = 14.dp)) {
-                Text(name, style = MaterialTheme.typography.titleMedium, color = if (aktiv) Hc.farben.ink else Hc.farben.muted)
-                if (!aktiv) Text("Kommt bald", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
-            }
+private fun AbschnittKopf(titel: String, anzahl: Int) {
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            titel.uppercase(), color = Hc.farben.muted, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = 0.9.sp,
+        )
+        Text(
+            anzahl.toString(), color = Hc.farben.muted, fontSize = 11.sp,
+            modifier = Modifier.padding(start = 10.dp)
+                .background(Hc.farben.card2, RoundedCornerShape(10.dp))
+                .border(1.dp, Hc.farben.line, RoundedCornerShape(10.dp))
+                .padding(horizontal = 8.dp),
+        )
+        Box(Modifier.padding(start = 10.dp).weight(1f).height(1.dp).background(Hc.farben.line))
+    }
+}
+
+/** Kachel wie `.app-tile`: 74 dp große Karte mit 40 dp Symbol, Name darunter. Nicht umgesetzte Apps sind abgeblendet. */
+@Composable
+private fun AppKachel(name: String, @DrawableRes symbol: Int, umgesetzt: Boolean, onClick: () -> Unit) {
+    val form = RoundedCornerShape(20.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth().clickable(enabled = umgesetzt, onClick = onClick),
+    ) {
+        Box(
+            Modifier.size(74.dp).shadow(4.dp, form).background(Hc.farben.card, form).border(1.dp, Hc.farben.line, form),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painterResource(symbol), contentDescription = name,
+                modifier = Modifier.size(40.dp).alpha(if (umgesetzt) 1f else 0.45f),
+            )
         }
+        Text(
+            name, fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 2,
+            color = if (umgesetzt) Hc.farben.ink else Hc.farben.muted,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        if (!umgesetzt) Text("bald", fontSize = 11.sp, color = Hc.farben.muted)
     }
 }
 
