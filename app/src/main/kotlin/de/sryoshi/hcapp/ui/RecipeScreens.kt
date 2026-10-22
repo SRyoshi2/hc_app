@@ -183,7 +183,7 @@ fun RecipeScreen(vm: AppViewModel, s: Screen.Recipe) {
                 }
             }
         }
-        if (r.description.isNotBlank()) item { Text(r.description) }
+        if (r.description.isNotBlank()) item { HtmlText(r.description) }
         item { Aktionen(vm, s, r) }
         item { ErrorText(vm) }
         if (r.ingredientSections.any { it.ingredients.isNotEmpty() }) {
@@ -234,7 +234,7 @@ private fun Zutaten(r: RecipeDetail) {
         abschnitt.ingredients.forEach { z ->
             val menge = listOf(zahlKurz(z.amount), z.unitLabel).filter { it.isNotBlank() }.joinToString(" ")
             Row {
-                Text(menge, color = Hc.farben.muted, modifier = Modifier.width(84.dp))
+                Text(menge, color = Hc.farben.muted, modifier = Modifier.width(104.dp))
                 Text(z.name + if (z.note.isNotBlank()) " (${z.note})" else "", modifier = Modifier.weight(1f))
             }
         }
@@ -248,7 +248,7 @@ private fun Schritte(r: RecipeDetail) {
             Text("${i + 1}.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             Column(Modifier.weight(1f)) {
                 if (schritt.heading.isNotBlank()) Text(schritt.heading, fontWeight = FontWeight.SemiBold)
-                Text(schritt.text)
+                HtmlText(schritt.text)
             }
         }
     }
