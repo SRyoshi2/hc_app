@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Grund des Family-Manager-Logos (home/static/img/marke/icon-maskable-512_familie.png) -->
+    <color name="ic_launcher_background">#111111</color>
+</resources>
