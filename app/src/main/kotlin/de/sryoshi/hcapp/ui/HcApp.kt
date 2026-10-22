@@ -172,24 +172,29 @@ private fun InstancesScreen(vm: AppViewModel) {
 
 @Composable
 private fun InstanceCard(vm: AppViewModel, i: Instance) {
-    var abmelden by remember { mutableStateOf(false) }
+    var entfernen by remember { mutableStateOf(false) }
+    val angemeldet = i.id in vm.angemeldet
     HcKarte(Modifier.fillMaxWidth(), onClick = { vm.open(i) }) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(i.name, style = MaterialTheme.typography.titleMedium)
-                Text(i.url, style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
-                Text("Angemeldet als ${i.displayName}", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+        Column(Modifier.padding(start = 16.dp, top = 16.dp, end = 8.dp, bottom = 4.dp)) {
+            Text(i.name, style = MaterialTheme.typography.titleMedium)
+            Text(i.url, style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+            Text(
+                if (angemeldet) "Angemeldet als ${i.displayName}" else "Abgemeldet – zum Anmelden antippen",
+                style = MaterialTheme.typography.bodySmall, color = if (angemeldet) Hc.farben.muted else MaterialTheme.colorScheme.primary,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (angemeldet) TextButton(onClick = { vm.signOut(i) }) { Text("Abmelden") }
+                TextButton(onClick = { entfernen = true }) { Text("Entfernen") }
             }
-            TextButton(onClick = { abmelden = true }) { Text("Entfernen") }
         }
     }
-    if (abmelden) {
+    if (entfernen) {
         AlertDialog(
-            onDismissRequest = { abmelden = false },
+            onDismissRequest = { entfernen = false },
             title = { Text("Instanz entfernen?") },
-            text = { Text("Du wirst abgemeldet, und die Anmeldung dieses Geräts wird auf der Instanz widerrufen. Die Daten auf der Instanz bleiben unberührt.") },
-            confirmButton = { TextButton(onClick = { abmelden = false; vm.signOut(i) }) { Text("Entfernen") } },
-            dismissButton = { TextButton(onClick = { abmelden = false }) { Text("Abbrechen") } },
+            text = { Text("Die Instanz verschwindet aus der Liste, die Anmeldung dieses Geräts wird auf der Instanz widerrufen. Zum erneuten Verwenden musst du die Adresse neu eingeben. Die Daten auf der Instanz bleiben unberührt.") },
+            confirmButton = { TextButton(onClick = { entfernen = false; vm.removeInstance(i) }) { Text("Entfernen") } },
+            dismissButton = { TextButton(onClick = { entfernen = false }) { Text("Abbrechen") } },
         )
     }
 }

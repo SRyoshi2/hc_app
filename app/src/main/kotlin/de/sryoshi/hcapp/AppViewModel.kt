@@ -45,6 +45,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     var instances by mutableStateOf(store.alle())
         private set
+    /** Ids der Instanzen, für die gerade ein Token gespeichert ist (die Liste zeigt „angemeldet“ bzw. „abgemeldet“). */
+    var angemeldet by mutableStateOf(instances.filter { store.hatToken(it.id) }.map { it.id }.toSet())
+        private set
     var screen by mutableStateOf<Screen>(if (instances.isEmpty()) Screen.AddInstance else Screen.Instances)
         private set
     var busy by mutableStateOf(false)
@@ -88,6 +91,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** Liest Instanzen und Anmeldestatus neu aus dem Speicher. */
+    private fun sitzungenLesen() {
+        instances = store.alle()
+        angemeldet = instances.filter { store.hatToken(it.id) }.map { it.id }.toSet()
+    }
+
     private fun client(instance: Instance) = ApiClient(instance.url, { store.token(instance.id) })
 
     /** Führt [block] mit Fortschrittsanzeige aus und übersetzt Fehler in einen lesbaren Text. */
@@ -122,6 +131,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Token ungültig: lokal verwerfen und zur Anmeldung zurück. Darf selbst nicht werfen (läuft im catch). */
     private suspend fun abgelaufen(instance: Instance) {
         store.tokenVerwerfen(instance.id)
+        sitzungenLesen()
         val meta = try {
             client(instance).meta()
         } catch (e: ApiException) {
@@ -153,7 +163,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .copy(name = login.meta.productName, mode = login.meta.mode,
                 username = antwort.user.username, displayName = antwort.user.displayName)
         store.speichern(instanz, antwort.token)
-        instances = store.alle()
+        sitzungenLesen()
         screen = Screen.Home(instanz, client(instanz).me())
     }
 
@@ -172,16 +182,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (aktuell != instance) {
             store.aktualisieren(aktuell)
-            instances = store.alle()
+            sitzungenLesen()
         }
         screen = Screen.Home(aktuell, api.me())
     }
 
+    /** Abmelden: Token auf dem Server widerrufen und lokal löschen. Die Instanz bleibt für die nächste Anmeldung gespeichert. */
     fun signOut(instance: Instance) = run {
         // Das Token auf dem Server zu widerrufen ist gut, aber nicht zwingend: ohne Verbindung wird es lokal gelöscht.
         runCatching { client(instance).logout() }
+        store.tokenVerwerfen(instance.id)
+        sitzungenLesen()
+    }
+
+    /** Entfernen: wie Abmelden, und die Instanz verschwindet aus der Liste. */
+    fun removeInstance(instance: Instance) = run {
+        runCatching { client(instance).logout() }
         store.entfernen(instance.id)
-        instances = store.alle()
+        sitzungenLesen()
         screen = if (instances.isEmpty()) Screen.AddInstance else Screen.Instances
     }
 

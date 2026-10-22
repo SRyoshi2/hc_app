@@ -43,6 +43,9 @@ class InstanceStore(context: Context) {
 
     fun token(id: String): String? = prefs.getString(tokenSchluessel(id), null)?.let(TokenCipher::entschluesseln)
 
+    /** Ist für die Instanz ein Token gespeichert? (Ohne zu entschlüsseln.) */
+    fun hatToken(id: String): Boolean = prefs.contains(tokenSchluessel(id))
+
     fun tokenVerwerfen(id: String) = prefs.edit().remove(tokenSchluessel(id)).apply()
 
     fun entfernen(id: String) {
