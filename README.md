@@ -34,28 +34,21 @@ Das Modul `app` wird nur eingebunden, wenn ein Android SDK gefunden wird (`ANDRO
 
 ## Design
 
-Die Farben folgen der Web-App (`home/static/css/hc_theme.css`, OweMe-Vorlagen), Hell und Dunkel nach
-Systemeinstellung. Umgesetzt in `app/.../ui/theme/HcTheme.kt`:
+Neutrale Flächen und Text folgen der Web-App (`home/static/css/hc_theme.css`), Hell und Dunkel nach Systemeinstellung.
+**Jede App hat ein eigenes Farbset, abgeleitet aus ihrem Icon** (`app/.../ui/theme/HcTheme.kt`, `Welt` und `AppFarben`):
 
-| Welt | Farbe | Apps |
-|---|---|---|
-| Küche | Grün `#2e7d4f` (dunkel `#57b57c`) | Einkaufsliste, Rezepte |
-| Health | Petrol `#0f766e` / Kopf `#0f3b36` (dunkel `#2dd4bf` / `#16302c`) | Health |
-| OweMe | Petrol-Kopf `#123a36`, „bekomme“ `#1f7a6e`, „schulde“ `#b0762a` | OweMe |
-| HomeCenter | Rot `#dc3545` | Instanzen, Anmeldung, Startseite |
+| App | Kopfzeile (Icon-Farbe) | Akzent hell / dunkel | Zweite Farbe |
+|---|---|---|---|
+| Einkaufsliste | Mulberry `#ca5e93`, weiße Schrift | `#ad507e` / `#cc6396` | – |
+| Rezeptverwaltung | Orange `#fd7e14`, dunkle Schrift | `#b1580e` / `#fd7e14` | – |
+| OweMe | Petrol `#2c5f59`, weiße Schrift | `#2c5f59` / `#50c0b0` | Ocker `#b0762a` / `#d8a858` |
+| Health | Petrol `#0f766e`, weiße Schrift | `#0f766e` / `#14b8a6` | Herz-Türkis `#14b8a6` |
+| HomeCenter (Instanzen, Anmeldung, Startseite) | neutral | Rot `#dc3545` | – |
 
-Artikel tragen eine Kante in einer der neun Kategoriefarben (`--hc-cat-1..9`). Das Web verteilt sie per
-Hash auf den Namen; der Hash der App ist nicht derselbe, dieselbe Kategorie kann daher eine andere Farbe haben.
-Ändern sich im Web die Farben, `HcTheme.kt` nachziehen.
-
-## Sicherheitsregeln
-
-- `https://` ist Standard. `http://` nimmt die App nur für lokale Adressen an
-  (`localhost`, 10.x, 172.16–31.x, 192.168.x, 169.254.x, `.local`, `.lan`, Namen ohne Punkt).
-  Das Android-Manifest erlaubt Klartext grundsätzlich, weil sich private Bereiche dort nicht
-  freigeben lassen; die Prüfung geschieht vor dem Senden des Passworts in `InstanceUrl`.
-- Tokens liegen verschlüsselt (AES-256-GCM, Schlüssel im Keystore), nie im Klartext.
-- Weiterleitungen folgt der Client nicht.
+Die Kopfzeile trägt genau die Icon-Farbe. Der Akzent (Knöpfe, Links, Auswahl) ist im Hellmodus so weit abgedunkelt, dass
+weiße Schrift darauf und der Akzent als Text mindestens 4,5:1 Kontrast haben. Orange ist die Ausnahme beim Titel: mit
+Weiß nur 2,6:1, deshalb dunkle Schrift. Artikel tragen eine Kante in einer der neun Kategoriefarben (`--hc-cat-1..9`);
+das Web verteilt sie per Hash auf den Namen, der Hash der App ist ein anderer.
 
 ## Release und Updates (fester Signaturschlüssel)
 
