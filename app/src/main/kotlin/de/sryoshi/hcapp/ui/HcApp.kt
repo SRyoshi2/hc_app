@@ -98,6 +98,9 @@ fun HcApp(vm: AppViewModel) {
         is Screen.Recipe -> s.title
         is Screen.RecipeShopping -> "In die Einkaufsliste"
         is Screen.RecipeEdit -> if (s.key == null) "Neues Rezept" else "Rezept bearbeiten"
+        is Screen.OweMeUebersicht -> "OweMe"
+        is Screen.OweMeKonto -> s.title
+        is Screen.OweMeRatenplan -> "Rückzahlungsplan"
     }
     val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
@@ -132,6 +135,9 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.Recipe -> RecipeScreen(vm, s)
                 is Screen.RecipeShopping -> RecipeShoppingScreen(vm, s)
                 is Screen.RecipeEdit -> RecipeEditScreen(vm, s)
+                is Screen.OweMeUebersicht -> OweMeUebersichtScreen(vm, s)
+                is Screen.OweMeKonto -> OweMeKontoScreen(vm, s)
+                is Screen.OweMeRatenplan -> OweMeRatenplanScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
@@ -256,7 +262,7 @@ private class AppEintrag(
 private val APPS = listOf(
     AppEintrag(AppKey.SHOPPING, "Einkaufsliste", "Einkaufsliste", R.drawable.app_einkaufsliste, true) { Screen.Lists(it.instance, it.me) },
     AppEintrag(AppKey.RECIPES, "Rezeptverwaltung", "Rezeptverwaltung", R.drawable.app_rezepte, true) { Screen.Recipes(it.instance, it.me) },
-    AppEintrag(AppKey.OWEME, "OweMe", "OweMe", R.drawable.app_oweme, false),
+    AppEintrag(AppKey.OWEME, "OweMe", "OweMe", R.drawable.app_oweme, true) { Screen.OweMeUebersicht(it.instance, it.me) },
     AppEintrag(AppKey.HEALTH, "Health", "Health", R.drawable.app_health, false),
 )
 

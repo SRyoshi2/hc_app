@@ -15,7 +15,9 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | Rezepte lesen (eigene, entdecken, Suche), Rezeptdetail, Portionen wählen und Zutaten in eine bestehende oder neue Einkaufsliste übernehmen, öffentliche Rezepte kopieren | umgesetzt (API Phase 2) |
 | Rezepte anlegen, bearbeiten, löschen: Titel, Portionen, Zeiten, Schwierigkeit, Beschreibung, Kategorien (auch neu anlegen), öffentlich/privat, Zutaten mit Abschnitten, Schritte, Nährwerte, Titelbild | umgesetzt (API Phase 3) |
 | Rezept-Galerie (weitere Bilder), Video, Quelle, Formatierung (Fett, Listen) beim Bearbeiten | nicht in der App; bleibt auf dem Server unverändert |
-| OweMe, Health | wartet auf API-Phasen 4–6 |
+| OweMe: Übersicht (bekomme/schulde/Saldo, fällige Konten), Konten anlegen/ändern/löschen, Kontoauszug mit Stand je Zeile, Geld gegeben und Rückzahlungen erfassen/ändern/löschen, Rückzahlungsplan (Ratenhöhe, Anzahl, Enddatum oder einzeln; ansehen, ersetzen, beenden) | umgesetzt (API Phase 4) |
+| OweMe: Person aus Adressbuch oder HomeCenter-Benutzer wählen, Konto teilen, Export | nicht in der App (Name wird frei eingegeben) |
+| Health | wartet auf API-Phasen 5–6 |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die
 Entwicklungsumgebung, in der der Code entstand, erreicht Maven Central und Google Maven nicht
@@ -87,5 +89,5 @@ Release derselbe sein.
 
 ## Voraussetzung auf der Instanz
 
-Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 3).
+Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 4).
 Ältere Instanzen melden „unterstützt die App noch nicht“.

@@ -17,6 +17,11 @@ import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.Me
+import de.sryoshi.hcapp.core.OweMePlanInput
+import de.sryoshi.hcapp.core.OweMeOverview
+import de.sryoshi.hcapp.core.OweMeEntryPatch
+import de.sryoshi.hcapp.core.OweMeAccountPatch
+import de.sryoshi.hcapp.core.OweMeAccountDetail
 import de.sryoshi.hcapp.core.Meta
 import de.sryoshi.hcapp.core.RecipeCategory
 import de.sryoshi.hcapp.core.RecipeDetail
@@ -46,6 +51,9 @@ sealed interface Screen {
     data class RecipeShopping(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
     /** [key] `null` = neues Rezept. */
     data class RecipeEdit(val instance: Instance, val me: Me, val key: String?, val title: String) : Screen
+    data class OweMeUebersicht(val instance: Instance, val me: Me) : Screen
+    data class OweMeKonto(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
+    data class OweMeRatenplan(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -85,6 +93,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var kategorien by mutableStateOf<List<RecipeCategory>>(emptyList())
         private set
 
+    var oweMe by mutableStateOf<OweMeOverview?>(null)
+        private set
+    var konto by mutableStateOf<OweMeAccountDetail?>(null)
+        private set
+
     fun clearError() { error = null }
 
     fun show(neu: Screen) { error = null; screen = neu }
@@ -99,6 +112,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.Recipes -> Screen.Home(s.instance, s.me)
                 is Screen.Recipe -> Screen.Recipes(s.instance, s.me)
                 is Screen.RecipeShopping -> Screen.Recipe(s.instance, s.me, s.key, s.title)
+                is Screen.OweMeUebersicht -> Screen.Home(s.instance, s.me)
+                is Screen.OweMeKonto -> Screen.OweMeUebersicht(s.instance, s.me)
+                is Screen.OweMeRatenplan -> Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
                 is Screen.RecipeEdit -> {
                     entwurf = null
                     if (s.key == null) Screen.Recipes(s.instance, s.me) else Screen.Recipe(s.instance, s.me, s.key, s.title)
@@ -143,9 +159,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ApiException.NETWORK -> "Die Instanz ist nicht erreichbar. Adresse und Verbindung prüfen."
         "app_disabled" -> "Diese App ist auf dieser Instanz abgeschaltet."
         // Mit den Feldern des Servers („Titel: Dieses Feld ist erforderlich.“) statt nur „Die Eingaben sind nicht gültig.“
-        "validation_error" -> FeldFehler.meldungen(e.fields).joinToString("\n").ifBlank { e.message }
+        "validation_error" -> FeldFehler.meldungen(e.fields, beschriftung()).joinToString("\n").ifBlank { e.message }
         "forbidden" -> "Das darf nur der Besitzer."
         else -> e.message
+    }
+
+    /** In OweMe heißen einige Felder anders als bei Rezepten (Betrag statt Menge, Notiz statt Hinweis). */
+    private fun beschriftung(): Map<String, String> = when (screen) {
+        is Screen.OweMeUebersicht, is Screen.OweMeKonto, is Screen.OweMeRatenplan -> FeldFehler.OWEME
+        else -> emptyMap()
     }
 
     /** Token ungültig: lokal verwerfen und zur Anmeldung zurück. Darf selbst nicht werfen (läuft im catch). */
@@ -358,5 +380,61 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         client(s.instance).deleteRecipe(s.key)
         recipe = null
         screen = Screen.Recipes(s.instance, s.me)
+    }
+    // ── OweMe ───────────────────────────────────────────────────────────
+
+    fun loadOweMe(s: Screen.OweMeUebersicht) = run(s.instance) { oweMe = client(s.instance).oweMe() }
+
+    /** Legt das Konto an und zeigt es gleich. */
+    fun createOweMeAccount(s: Screen.OweMeUebersicht, patch: OweMeAccountPatch) = run(s.instance) {
+        val neu = client(s.instance).createOweMeAccount(patch)
+        konto = neu
+        screen = Screen.OweMeKonto(s.instance, s.me, neu.account.key, neu.account.personName)
+    }
+
+    fun loadOweMeAccount(s: Screen.OweMeKonto) {
+        if (konto?.account?.key != s.key) konto = null
+        run(s.instance) { konto = client(s.instance).oweMeAccount(s.key) }
+    }
+
+    fun updateOweMeAccount(s: Screen.OweMeKonto, patch: OweMeAccountPatch) = run(s.instance) {
+        konto = client(s.instance).updateOweMeAccount(s.key, patch)
+    }
+
+    fun deleteOweMeAccount(s: Screen.OweMeKonto) = run(s.instance) {
+        client(s.instance).deleteOweMeAccount(s.key)
+        konto = null
+        screen = Screen.OweMeUebersicht(s.instance, s.me)
+    }
+
+    /** Neue Bewegung; danach wird der Kontoauszug neu gelesen, weil sich die Stände aller späteren Zeilen ändern. */
+    fun addOweMeEntry(s: Screen.OweMeKonto, kind: String, patch: OweMeEntryPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.addOweMeEntry(s.key, kind, patch)
+        konto = api.oweMeAccount(s.key)
+    }
+
+    fun updateOweMeEntry(s: Screen.OweMeKonto, id: Long, patch: OweMeEntryPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateOweMeEntry(id, patch)
+        konto = api.oweMeAccount(s.key)
+    }
+
+    fun deleteOweMeEntry(s: Screen.OweMeKonto, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteOweMeEntry(id)
+        konto = api.oweMeAccount(s.key)
+    }
+
+    fun setOweMePlan(s: Screen.OweMeRatenplan, plan: OweMePlanInput) = run(s.instance) {
+        konto = client(s.instance).setOweMePlan(s.key, plan)
+        screen = Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
+    }
+
+    fun deleteOweMePlan(s: Screen.OweMeRatenplan) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteOweMePlan(s.key)
+        konto = api.oweMeAccount(s.key)
+        screen = Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
     }
 }
