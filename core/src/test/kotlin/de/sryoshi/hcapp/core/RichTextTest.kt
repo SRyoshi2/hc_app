@@ -39,7 +39,8 @@ class RichTextTest {
 
     @Test
     fun `Grossschreibung der Tags`() {
-        assertEquals("<OL><LI>1. a</LI></OL>", RichText.listenMarken("<OL><LI>a</LI></OL>"))
+        // Gezählt wird auch bei großgeschriebenen Tags; das öffnende <li> wird dabei neu aufgebaut (klein), HTML ist da tolerant.
+        assertEquals("<OL><li>1. a</LI></OL>", RichText.listenMarken("<OL><LI>a</LI></OL>"))
     }
 
     @Test

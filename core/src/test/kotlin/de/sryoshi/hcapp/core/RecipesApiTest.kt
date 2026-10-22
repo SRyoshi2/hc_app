@@ -18,6 +18,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RecipesApiTest {
+    private val lenientJson = Json { ignoreUnknownKeys = true }
     private lateinit var server: MockWebServer
     private lateinit var client: ApiClient
 
@@ -73,7 +74,7 @@ class RecipesApiTest {
 
     @Test
     fun `Gesamtzeit fehlt, wenn nichts angegeben ist`() {
-        val r = Json { ignoreUnknownKeys = true }.decodeFromString<RecipeSummary>("""{"key":"k","title":"T"}""")
+        val r = lenientJson.decodeFromString<RecipeSummary>("""{"key":"k","title":"T"}""")
         assertNull(r.gesamtMinuten)
         assertEquals(1, r.servings)
     }
