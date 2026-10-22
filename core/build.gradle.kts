@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.serialization)
+    id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Bytecode für Java 17, damit das Android-Modul :core einbinden kann. Gebaut wird mit dem vorhandenen JDK,
