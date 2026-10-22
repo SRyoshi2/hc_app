@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -115,6 +116,40 @@ class ApiClient(
         newListTitle?.let { felder["new_list_title"] = JsonPrimitive(it) }
         return post("recipes/$key/to-shopping-list/", JsonObject(felder))
     }
+
+    /** Neues Rezept. Nur gesetzte Felder werden gesendet; `title` ist Pflicht. Liefert das gespeicherte Rezept. */
+    suspend fun createRecipe(patch: RecipePatch): RecipeDetail = post("recipes/", patch.alsJson())
+
+    /** Ändert nur die in [patch] gesetzten Felder (nur der Besitzer; sonst 403 `forbidden`). */
+    suspend fun updateRecipe(key: String, patch: RecipePatch): RecipeDetail = send("PATCH", "recipes/$key/", patch.alsJson())
+
+    suspend fun deleteRecipe(key: String) = ohneAntwort("DELETE", "recipes/$key/")
+
+    /**
+     * Bild hochladen: [asTitle] setzt das Titelbild, sonst kommt es in die Galerie. Der Server lehnt Dateien über
+     * 10 MB ab. Liefert das Rezept mit dem neuen Bild.
+     */
+    suspend fun uploadRecipeImage(
+        key: String, bild: ByteArray, dateiname: String, mimeType: String, asTitle: Boolean, caption: String = "",
+    ): RecipeDetail {
+        val teile = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("image", dateiname, bild.toRequestBody(mimeType.toMediaType()))
+            .addFormDataPart("title", if (asTitle) "true" else "false")
+            .apply { if (caption.isNotBlank()) addFormDataPart("caption", caption) }
+            .build()
+        val url = basis.newBuilder().addPathSegments("api/v1/recipes/$key/images/").build()
+        val request = Request.Builder().url(url).post(teile).header("Accept", "application/json")
+            .apply { token()?.let { header("Authorization", "Bearer $it") } }
+            .build()
+        return antwort(request)
+    }
+
+    suspend fun deleteRecipeImage(key: String, bildId: Long) = ohneAntwort("DELETE", "recipes/$key/images/$bildId/")
+
+    suspend fun deleteRecipeTitleImage(key: String) = ohneAntwort("DELETE", "recipes/$key/title-image/")
+
+    /** Legt eine Kategorie an; gibt es sie schon, kommt die vorhandene zurück. */
+    suspend fun createRecipeCategory(name: String): RecipeCategory = post("recipe-categories/", obj("name" to name))
 
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {

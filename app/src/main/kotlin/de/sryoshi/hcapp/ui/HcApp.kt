@@ -97,6 +97,7 @@ fun HcApp(vm: AppViewModel) {
         is Screen.Recipes -> "Rezeptverwaltung"
         is Screen.Recipe -> s.title
         is Screen.RecipeShopping -> "In die Einkaufsliste"
+        is Screen.RecipeEdit -> if (s.key == null) "Neues Rezept" else "Rezept bearbeiten"
     }
     val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
@@ -130,6 +131,7 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.Recipes -> RecipesScreen(vm, s)
                 is Screen.Recipe -> RecipeScreen(vm, s)
                 is Screen.RecipeShopping -> RecipeShoppingScreen(vm, s)
+                is Screen.RecipeEdit -> RecipeEditScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
@@ -407,7 +409,7 @@ private fun ListsScreen(vm: AppViewModel, s: Screen.Lists) {
 }
 
 @Composable
-private fun TitelDialog(titel: String, onOk: (String) -> Unit, onCancel: () -> Unit) {
+internal fun TitelDialog(titel: String, onOk: (String) -> Unit, onCancel: () -> Unit) {
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onCancel,

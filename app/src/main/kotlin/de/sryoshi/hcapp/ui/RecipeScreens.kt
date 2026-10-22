@@ -24,7 +24,10 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,12 +61,6 @@ import de.sryoshi.hcapp.ui.theme.Hc
 
 // ── Hilfen ──────────────────────────────────────────────────────────────
 
-/** `"500.00"` → `"500"`, `"1.50"` → `"1.5"`; kein Dezimalpunkt bleibt unverändert. */
-private fun zahlKurz(text: String?): String {
-    if (text.isNullOrBlank()) return ""
-    return if ('.' in text) text.trimEnd('0').trimEnd('.') else text
-}
-
 private fun metaZeile(portionen: Int, minuten: Int?, schwierigkeit: String): String =
     listOfNotNull(
         "$portionen ${if (portionen == 1) "Portion" else "Portionen"}",
@@ -90,6 +87,7 @@ fun RecipesScreen(vm: AppViewModel, s: Screen.Recipes) {
     LaunchedEffect(s) { vm.loadRecipes(s) }
     var suche by rememberSaveable { mutableStateOf(vm.recipeQuery) }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = vm.recipeTab, containerColor = Hc.farben.card, contentColor = MaterialTheme.colorScheme.primary) {
             Tab(selected = vm.recipeTab == 0, onClick = { vm.setRecipeTab(s, 0) }, text = { Text("Meine Rezepte") })
@@ -116,10 +114,20 @@ fun RecipesScreen(vm: AppViewModel, s: Screen.Recipes) {
                     color = Hc.farben.muted, modifier = Modifier.padding(vertical = 24.dp),
                 )
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 88.dp),
+            ) {
                 items(vm.recipes, key = { it.key }) { r -> RezeptZeile(vm, s, r) }
             }
         }
+    }
+    if (vm.recipeTab == 0) {
+        FloatingActionButton(
+            onClick = { vm.show(Screen.RecipeEdit(s.instance, s.me, null, "")) },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        ) { Icon(Icons.Default.Add, "Neues Rezept") }
+    }
     }
 }
 
@@ -201,6 +209,7 @@ fun RecipeScreen(vm: AppViewModel, s: Screen.Recipe) {
 
 @Composable
 private fun Aktionen(vm: AppViewModel, s: Screen.Recipe, r: RecipeDetail) {
+    var loeschen by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { vm.show(Screen.RecipeShopping(s.instance, s.me, r.key, r.title)) },
@@ -212,6 +221,24 @@ private fun Aktionen(vm: AppViewModel, s: Screen.Recipe, r: RecipeDetail) {
                 Text("Als eigenes Rezept übernehmen")
             }
         }
+        if (r.canEdit) {
+            OutlinedButton(
+                onClick = { vm.show(Screen.RecipeEdit(s.instance, s.me, r.key, r.title)) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Bearbeiten") }
+            TextButton(onClick = { loeschen = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Rezept löschen", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    if (loeschen) {
+        AlertDialog(
+            onDismissRequest = { loeschen = false },
+            title = { Text("Rezept löschen?") },
+            text = { Text("„${r.title}“ wird endgültig gelöscht, auch aus geteilten Ansichten.") },
+            confirmButton = { TextButton(onClick = { loeschen = false; vm.deleteRecipe(s) }) { Text("Löschen") } },
+            dismissButton = { TextButton(onClick = { loeschen = false }) { Text("Abbrechen") } },
+        )
     }
 }
 

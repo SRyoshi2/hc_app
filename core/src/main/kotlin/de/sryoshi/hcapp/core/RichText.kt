@@ -34,4 +34,19 @@ object RichText {
             }
         }
     }
+
+    private val ABSATZ = Regex("""\n\s*\n""")
+
+    /**
+     * Einfacher Text aus einem Eingabefeld → HTML für den Server: Leerzeile = neuer Absatz, einfacher Zeilenumbruch
+     * = `<br>`, Sonderzeichen werden maskiert. Leer bleibt leer. Der Server filtert das Ergebnis ohnehin noch einmal.
+     */
+    fun klartextZuHtml(text: String): String {
+        val sauber = text.replace("\r\n", "\n").replace('\r', '\n').trim()
+        if (sauber.isEmpty()) return ""
+        return sauber.split(ABSATZ).joinToString("") { absatz ->
+            val maskiert = absatz.trim().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            "<p>" + maskiert.replace("\n", "<br>") + "</p>"
+        }
+    }
 }

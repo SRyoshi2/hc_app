@@ -59,6 +59,9 @@ fun htmlZuText(html: String, linkFarbe: Color): AnnotatedString {
     }
 }
 
+/** Der Text ohne Formatierung (Listenpunkte als `•` bzw. `1.`), zum Bearbeiten in einem Eingabefeld. */
+fun htmlZuKlartext(html: String): String = htmlZuText(html, Color.Unspecified).text
+
 /** Text, der HTML enthalten darf (Beschreibung, Zubereitungsschritte). */
 @Composable
 fun HtmlText(html: String, modifier: Modifier = Modifier, style: TextStyle = LocalTextStyle.current) {

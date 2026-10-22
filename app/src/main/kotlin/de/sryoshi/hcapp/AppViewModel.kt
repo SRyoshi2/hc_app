@@ -3,6 +3,7 @@ package de.sryoshi.hcapp
 import android.app.Application
 import android.os.Build
 import android.util.Log
+import java.io.IOException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,19 +11,24 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.sryoshi.hcapp.core.ApiClient
 import de.sryoshi.hcapp.core.ApiException
+import de.sryoshi.hcapp.core.FeldFehler
 import de.sryoshi.hcapp.core.Compatibility
 import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.Me
 import de.sryoshi.hcapp.core.Meta
+import de.sryoshi.hcapp.core.RecipeCategory
 import de.sryoshi.hcapp.core.RecipeDetail
 import de.sryoshi.hcapp.core.RecipeSummary
 import de.sryoshi.hcapp.core.ShoppingItem
 import de.sryoshi.hcapp.core.ShoppingList
 import de.sryoshi.hcapp.core.ShoppingPreview
+import de.sryoshi.hcapp.data.BildHelfer
 import de.sryoshi.hcapp.data.Instance
 import de.sryoshi.hcapp.data.InstanceStore
+import de.sryoshi.hcapp.ui.RezeptEntwurf
+import de.sryoshi.hcapp.ui.htmlZuKlartext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -38,6 +44,8 @@ sealed interface Screen {
     data class Recipes(val instance: Instance, val me: Me) : Screen
     data class Recipe(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
     data class RecipeShopping(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
+    /** [key] `null` = neues Rezept. */
+    data class RecipeEdit(val instance: Instance, val me: Me, val key: String?, val title: String) : Screen
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -71,6 +79,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var preview by mutableStateOf<ShoppingPreview?>(null)
         private set
+    /** Arbeitsstand des Rezept-Editors; `null`, wenn keiner offen ist. */
+    var entwurf by mutableStateOf<RezeptEntwurf?>(null)
+        private set
+    var kategorien by mutableStateOf<List<RecipeCategory>>(emptyList())
+        private set
 
     fun clearError() { error = null }
 
@@ -86,6 +99,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.Recipes -> Screen.Home(s.instance, s.me)
                 is Screen.Recipe -> Screen.Recipes(s.instance, s.me)
                 is Screen.RecipeShopping -> Screen.Recipe(s.instance, s.me, s.key, s.title)
+                is Screen.RecipeEdit -> {
+                    entwurf = null
+                    if (s.key == null) Screen.Recipes(s.instance, s.me) else Screen.Recipe(s.instance, s.me, s.key, s.title)
+                }
                 Screen.Instances -> Screen.Instances
             },
         )
@@ -125,6 +142,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun text(e: ApiException) = when (e.code) {
         ApiException.NETWORK -> "Die Instanz ist nicht erreichbar. Adresse und Verbindung prüfen."
         "app_disabled" -> "Diese App ist auf dieser Instanz abgeschaltet."
+        // Mit den Feldern des Servers („Titel: Dieses Feld ist erforderlich.“) statt nur „Die Eingaben sind nicht gültig.“
+        "validation_error" -> FeldFehler.meldungen(e.fields).joinToString("\n").ifBlank { e.message }
+        "forbidden" -> "Das darf nur der Besitzer."
         else -> e.message
     }
 
@@ -281,5 +301,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ergebnis = client(s.instance).toShoppingList(s.key, listKey, if (listKey == null) titel else null, items)
         val name = lists.firstOrNull { it.key == ergebnis.listKey }?.title ?: titel.ifBlank { "Einkaufsliste" }
         screen = Screen.Items(s.instance, s.me, ergebnis.listKey, name)
+    }
+    // ── Rezepte bearbeiten ──────────────────────────────────────────────
+
+    /** Öffnet den Editor: lädt das Rezept (falls nötig) und die Kategorien. Ein offener Entwurf bleibt erhalten (Drehen des Geräts). */
+    fun startEditor(s: Screen.RecipeEdit) {
+        val vorhanden = entwurf
+        if (vorhanden != null && vorhanden.key == s.key) return
+        run(s.instance) {
+            val api = client(s.instance)
+            val detail = if (s.key == null) null else (recipe?.takeIf { it.key == s.key } ?: api.recipe(s.key))
+            kategorien = api.recipeCategories().results
+            entwurf = RezeptEntwurf(s.key, detail) { htmlZuKlartext(it) }
+        }
+    }
+
+    fun addRecipeCategory(s: Screen.RecipeEdit, name: String) = run(s.instance) {
+        val neu = client(s.instance).createRecipeCategory(name.trim())
+        kategorien = (kategorien + neu).distinctBy { it.id }
+        entwurf?.kategorien?.let { if (neu.id !in it) it.add(neu.id) }
+    }
+
+    /**
+     * Speichert den Entwurf (neu oder Änderung) und zeigt danach das Rezept. Das Titelbild geht in einem zweiten Schritt
+     * hoch: scheitert nur das Bild, ist das Rezept trotzdem gespeichert, und die App sagt das.
+     */
+    fun saveRecipe(s: Screen.RecipeEdit) = run(s.instance) {
+        val e = entwurf ?: return@run
+        val patch = e.zuPatch()
+        val api = client(s.instance)
+        var rezept = if (s.key == null) api.createRecipe(patch) else api.updateRecipe(s.key, patch)
+
+        var warnung: String? = null
+        try {
+            val bild = e.titelbild
+            if (bild != null) {
+                val daten = BildHelfer.vorbereiten(getApplication<Application>(), bild)
+                rezept = api.uploadRecipeImage(rezept.key, daten.bytes, daten.name, daten.mime, asTitle = true)
+            } else if (e.titelbildEntfernen && rezept.imageUrl != null) {
+                api.deleteRecipeTitleImage(rezept.key)
+                rezept = api.recipe(rezept.key)
+            }
+        } catch (x: ApiException) {
+            warnung = "Das Rezept ist gespeichert, aber das Titelbild nicht: ${text(x)}"
+        } catch (x: IOException) {
+            warnung = "Das Rezept ist gespeichert, aber das Titelbild nicht: ${x.message}"
+        }
+
+        recipe = rezept
+        entwurf = null
+        screen = Screen.Recipe(s.instance, s.me, rezept.key, rezept.title)
+        if (warnung != null) error = warnung
+    }
+
+    fun deleteRecipe(s: Screen.Recipe) = run(s.instance) {
+        client(s.instance).deleteRecipe(s.key)
+        recipe = null
+        screen = Screen.Recipes(s.instance, s.me)
     }
 }

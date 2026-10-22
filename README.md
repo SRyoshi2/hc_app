@@ -13,7 +13,8 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | Anmeldung mit Token (im Android Keystore verschlüsselt), Abmelden | umgesetzt |
 | Einkaufsliste (Listen, Artikel, Abhaken, Löschen) | umgesetzt |
 | Rezepte lesen (eigene, entdecken, Suche), Rezeptdetail, Portionen wählen und Zutaten in eine bestehende oder neue Einkaufsliste übernehmen, öffentliche Rezepte kopieren | umgesetzt (API Phase 2) |
-| Rezepte anlegen und bearbeiten | wartet auf API-Phase 3 |
+| Rezepte anlegen, bearbeiten, löschen: Titel, Portionen, Zeiten, Schwierigkeit, Beschreibung, Kategorien (auch neu anlegen), öffentlich/privat, Zutaten mit Abschnitten, Schritte, Nährwerte, Titelbild | umgesetzt (API Phase 3) |
+| Rezept-Galerie (weitere Bilder), Video, Quelle, Formatierung (Fett, Listen) beim Bearbeiten | nicht in der App; bleibt auf dem Server unverändert |
 | OweMe, Health | wartet auf API-Phasen 4–6 |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die
@@ -93,5 +94,5 @@ Release derselbe sein.
 
 ## Voraussetzung auf der Instanz
 
-Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 2).
+Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 3).
 Ältere Instanzen melden „unterstützt die App noch nicht“.

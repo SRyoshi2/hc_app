@@ -56,4 +56,22 @@ class RichTextTest {
         assertFalse(RichText.istHtml("5 < 6 und 7 > 3"))
         assertFalse(RichText.istHtml(""))
     }
+
+    @Test
+    fun `Klartext wird zu Absaetzen mit Zeilenumbruechen`() {
+        assertEquals("<p>Erst mischen.<br>Dann backen.</p><p>Fertig.</p>", RichText.klartextZuHtml("Erst mischen.\nDann backen.\n\nFertig."))
+    }
+
+    @Test
+    fun `Klartext maskiert Sonderzeichen und normalisiert Zeilenenden`() {
+        assertEquals("<p>5 &lt; 6 &amp; 7 &gt; 3</p>", RichText.klartextZuHtml("5 < 6 & 7 > 3"))
+        assertEquals("<p>a<br>b</p><p>c</p>", RichText.klartextZuHtml("a\r\nb\r\n\r\nc"))
+    }
+
+    @Test
+    fun `leerer Klartext bleibt leer`() {
+        assertEquals("", RichText.klartextZuHtml(""))
+        assertEquals("", RichText.klartextZuHtml("  \n \n "))
+        assertEquals("<p>x</p>", RichText.klartextZuHtml("\n\n x \n\n"))
+    }
 }
