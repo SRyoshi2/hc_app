@@ -35,6 +35,12 @@ class InstanceStore(context: Context) {
             .apply()
     }
 
+    /** Ändert die Angaben einer bekannten Instanz (Name, Betriebsart), ohne das Token anzufassen. */
+    fun aktualisieren(instanz: Instance) {
+        val neu = alle().map { if (it.id == instanz.id) instanz else it }
+        prefs.edit().putString(LISTE, json.encodeToString(serializer, neu)).apply()
+    }
+
     fun token(id: String): String? = prefs.getString(tokenSchluessel(id), null)?.let(TokenCipher::entschluesseln)
 
     fun tokenVerwerfen(id: String) = prefs.edit().remove(tokenSchluessel(id)).apply()

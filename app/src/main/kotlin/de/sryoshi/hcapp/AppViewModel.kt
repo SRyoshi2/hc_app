@@ -141,7 +141,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             abgelaufen(instance)
             return@run
         }
-        screen = Screen.Home(instance, client(instance).me())
+        val api = client(instance)
+        // Name und Betriebsart gehören der Instanz: Stellt ein Admin zwischen Privat und Enterprise um, ändern sich
+        // Produktname und Titel. Deshalb bei jedem Öffnen neu lesen und nicht vom Anmeldetag übernehmen.
+        val aktuell = try {
+            api.meta().let { instance.copy(name = it.productName, mode = it.mode) }
+        } catch (e: ApiException) {
+            instance // offline o. Ä.: mit den gespeicherten Angaben weitermachen, me() meldet den eigentlichen Fehler
+        }
+        if (aktuell != instance) {
+            store.aktualisieren(aktuell)
+            instances = store.alle()
+        }
+        screen = Screen.Home(aktuell, api.me())
     }
 
     fun signOut(instance: Instance) = run {
