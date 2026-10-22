@@ -3,6 +3,7 @@ package de.sryoshi.hcapp.core
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -79,6 +80,49 @@ class ApiClient(
     suspend fun toggleItem(id: Long): ShoppingItem = post("shopping-items/$id/toggle/", null)
 
     suspend fun deleteItem(id: Long) = ohneAntwort("DELETE", "shopping-items/$id/")
+
+    // ── Rezepte ─────────────────────────────────────────────────────────
+
+    /** Eigene Rezepte. [q] sucht in Titel und Kategorie, [categories] sind Kategorienamen (alle zutreffenden). */
+    suspend fun recipes(q: String = "", categories: List<String> = emptyList(), limit: Int = 50, offset: Int = 0): Page<RecipeSummary> =
+        get("recipes/", *rezeptAbfrage(q, categories, limit, offset))
+
+    /** „Entdecken“: öffentliche Rezepte anderer Nutzer. */
+    suspend fun publicRecipes(q: String = "", categories: List<String> = emptyList(), limit: Int = 50, offset: Int = 0): Page<RecipeSummary> =
+        get("recipes/public/", *rezeptAbfrage(q, categories, limit, offset))
+
+    suspend fun recipe(key: String): RecipeDetail = get("recipes/$key/")
+
+    suspend fun recipeCategories(): Page<RecipeCategory> = get("recipe-categories/", "limit" to "200")
+
+    /** Öffentliches Rezept als eigene Kopie übernehmen; liefert die Kopie. */
+    suspend fun copyRecipe(key: String): RecipeDetail = post("recipes/$key/copy/", null)
+
+    /** Zutaten auf [servings] Portionen hochgerechnet, nichts wird gespeichert. `null` = Portionen des Rezepts. */
+    suspend fun shoppingPreview(key: String, servings: String? = null): ShoppingPreview =
+        post("recipes/$key/shopping-preview/", obj("servings" to servings))
+
+    /**
+     * Zeilen in eine Einkaufsliste übernehmen: entweder [targetListKey] (bestehende Liste) **oder** [newListTitle]
+     * (neue Liste) – nie beides, der Server lehnt das ab.
+     */
+    suspend fun toShoppingList(key: String, targetListKey: String?, newListTitle: String?, items: List<ItemInput>): ToShoppingResult {
+        val zeilen = JsonArray(items.map {
+            obj("name" to it.name, "amount" to it.amount, "category" to it.category, "store" to it.store, "price" to it.price)
+        })
+        val felder = mutableMapOf<String, JsonElement>("items" to zeilen)
+        targetListKey?.let { felder["target_list_key"] = JsonPrimitive(it) }
+        newListTitle?.let { felder["new_list_title"] = JsonPrimitive(it) }
+        return post("recipes/$key/to-shopping-list/", JsonObject(felder))
+    }
+
+    private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
+        buildList {
+            add("limit" to limit.toString())
+            add("offset" to offset.toString())
+            if (q.isNotBlank()) add("q" to q.trim())
+            categories.forEach { add("category" to it) }
+        }.toTypedArray()
 
     // ── Technik ─────────────────────────────────────────────────────────
 

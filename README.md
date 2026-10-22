@@ -12,7 +12,9 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | Instanzen verwalten, Verbindungsprüfung (`/meta/`, Versionsabgleich) | umgesetzt |
 | Anmeldung mit Token (im Android Keystore verschlüsselt), Abmelden | umgesetzt |
 | Einkaufsliste (Listen, Artikel, Abhaken, Löschen) | umgesetzt |
-| Rezepte, Rezept → Einkaufsliste, OweMe, Health | wartet auf API-Phasen 2–6 |
+| Rezepte lesen (eigene, entdecken, Suche), Rezeptdetail, Portionen wählen und Zutaten in eine bestehende oder neue Einkaufsliste übernehmen, öffentliche Rezepte kopieren | umgesetzt (API Phase 2) |
+| Rezepte anlegen und bearbeiten | wartet auf API-Phase 3 |
+| OweMe, Health | wartet auf API-Phasen 4–6 |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die
 Entwicklungsumgebung, in der der Code entstand, erreicht Maven Central und Google Maven nicht
@@ -56,5 +58,5 @@ Hash auf den Namen; der Hash der App ist nicht derselbe, dieselbe Kategorie kann
 
 ## Voraussetzung auf der Instanz
 
-Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 und 1).
+Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 2).
 Ältere Instanzen melden „unterstützt die App noch nicht“.

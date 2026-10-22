@@ -8,8 +8,8 @@ import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import de.sryoshi.hcapp.ui.HcApp
+import de.sryoshi.hcapp.ui.welt
 import de.sryoshi.hcapp.ui.theme.HcTheme
-import de.sryoshi.hcapp.ui.theme.Welt
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
@@ -17,11 +17,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // Die Farbwelt folgt dem Bildschirm: Einkaufsliste im Küchen-Grün, sonst HomeCenter-Rot.
-            val welt = when (viewModel.screen) {
-                is Screen.Lists, is Screen.Items -> Welt.KUECHE
-                else -> Welt.HOMECENTER
-            }
+            // Die Farbwelt folgt dem Bildschirm: Küche (Einkaufsliste, Rezepte) im Grün, sonst HomeCenter-Rot.
+            val welt = viewModel.screen.welt()
             HcTheme(welt) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     // Zurück geht von jedem Bildschirm außer der Instanzliste (und dem ersten Einrichten) einen Schritt.

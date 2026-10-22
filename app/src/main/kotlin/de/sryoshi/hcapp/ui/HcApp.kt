@@ -80,7 +80,6 @@ import de.sryoshi.hcapp.core.ShoppingItem
 import de.sryoshi.hcapp.core.ShoppingList
 import de.sryoshi.hcapp.data.Instance
 import de.sryoshi.hcapp.ui.theme.Hc
-import de.sryoshi.hcapp.ui.theme.Welt
 import de.sryoshi.hcapp.ui.theme.kategorieFarbe
 import de.sryoshi.hcapp.ui.theme.kopf
 
@@ -95,11 +94,11 @@ fun HcApp(vm: AppViewModel) {
         is Screen.Home -> s.instance.name
         is Screen.Lists -> "Einkaufslisten"
         is Screen.Items -> s.title
+        is Screen.Recipes -> "Rezeptverwaltung"
+        is Screen.Recipe -> s.title
+        is Screen.RecipeShopping -> "In die Einkaufsliste"
     }
-    val welt = when (s) {
-        is Screen.Lists, is Screen.Items -> Welt.KUECHE
-        else -> Welt.HOMECENTER
-    }
+    val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
     val zurueck = s !is Screen.Instances && !(s is Screen.AddInstance && vm.instances.isEmpty())
 
@@ -128,6 +127,9 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.Home -> HomeScreen(vm, s)
                 is Screen.Lists -> ListsScreen(vm, s)
                 is Screen.Items -> ItemsScreen(vm, s)
+                is Screen.Recipes -> RecipesScreen(vm, s)
+                is Screen.Recipe -> RecipeScreen(vm, s)
+                is Screen.RecipeShopping -> RecipeShoppingScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
@@ -137,7 +139,7 @@ fun HcApp(vm: AppViewModel) {
 /** Karte wie im Web: Kartenfläche, 1 px Linie, abgerundet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HcKarte(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+internal fun HcKarte(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val farben = CardDefaults.cardColors(containerColor = Hc.farben.card)
     val rand = BorderStroke(1.dp, Hc.farben.line)
     val form = RoundedCornerShape(14.dp)
@@ -149,7 +151,7 @@ private fun HcKarte(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null
 }
 
 @Composable
-private fun ErrorText(vm: AppViewModel) {
+internal fun ErrorText(vm: AppViewModel) {
     vm.error?.let {
         Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp))
     }
@@ -246,7 +248,7 @@ private class AppEintrag(
 
 private val APPS = listOf(
     AppEintrag(AppKey.SHOPPING, "Einkaufsliste", "Einkaufsliste", R.drawable.app_einkaufsliste, true) { Screen.Lists(it.instance, it.me) },
-    AppEintrag(AppKey.RECIPES, "Rezeptverwaltung", "Rezeptverwaltung", R.drawable.app_rezepte, false),
+    AppEintrag(AppKey.RECIPES, "Rezeptverwaltung", "Rezeptverwaltung", R.drawable.app_rezepte, true) { Screen.Recipes(it.instance, it.me) },
     AppEintrag(AppKey.OWEME, "OweMe", "OweMe", R.drawable.app_oweme, false),
     AppEintrag(AppKey.HEALTH, "Health", "Health", R.drawable.app_health, false),
 )

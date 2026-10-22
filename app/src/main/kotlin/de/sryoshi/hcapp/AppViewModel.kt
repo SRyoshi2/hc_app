@@ -16,8 +16,11 @@ import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.Me
 import de.sryoshi.hcapp.core.Meta
+import de.sryoshi.hcapp.core.RecipeDetail
+import de.sryoshi.hcapp.core.RecipeSummary
 import de.sryoshi.hcapp.core.ShoppingItem
 import de.sryoshi.hcapp.core.ShoppingList
+import de.sryoshi.hcapp.core.ShoppingPreview
 import de.sryoshi.hcapp.data.Instance
 import de.sryoshi.hcapp.data.InstanceStore
 import kotlinx.coroutines.CancellationException
@@ -32,6 +35,9 @@ sealed interface Screen {
     data class Home(val instance: Instance, val me: Me) : Screen
     data class Lists(val instance: Instance, val me: Me) : Screen
     data class Items(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
+    data class Recipes(val instance: Instance, val me: Me) : Screen
+    data class Recipe(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
+    data class RecipeShopping(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -51,6 +57,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var items by mutableStateOf<List<ShoppingItem>>(emptyList())
         private set
 
+    // Rezepte: 0 = meine, 1 = entdecken (öffentliche). Tab und Suche bleiben beim Zurückgehen erhalten.
+    var recipeTab by mutableStateOf(0)
+        private set
+    var recipeQuery by mutableStateOf("")
+        private set
+    var recipes by mutableStateOf<List<RecipeSummary>>(emptyList())
+        private set
+    var recipe by mutableStateOf<RecipeDetail?>(null)
+        private set
+    var preview by mutableStateOf<ShoppingPreview?>(null)
+        private set
+
     fun clearError() { error = null }
 
     fun show(neu: Screen) { error = null; screen = neu }
@@ -62,6 +80,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.Home -> Screen.Instances
                 is Screen.Lists -> Screen.Home(s.instance, s.me)
                 is Screen.Items -> Screen.Lists(s.instance, s.me)
+                is Screen.Recipes -> Screen.Home(s.instance, s.me)
+                is Screen.Recipe -> Screen.Recipes(s.instance, s.me)
+                is Screen.RecipeShopping -> Screen.Recipe(s.instance, s.me, s.key, s.title)
                 Screen.Instances -> Screen.Instances
             },
         )
@@ -193,5 +214,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteItem(s: Screen.Items, artikel: ShoppingItem) = run(s.instance) {
         client(s.instance).deleteItem(artikel.id)
         items = items.filterNot { it.id == artikel.id }
+    }
+    // ── Rezepte ─────────────────────────────────────────────────────────
+
+    fun loadRecipes(s: Screen.Recipes) = run(s.instance) {
+        val api = client(s.instance)
+        recipes = (if (recipeTab == 0) api.recipes(q = recipeQuery) else api.publicRecipes(q = recipeQuery)).results
+    }
+
+    fun setRecipeTab(s: Screen.Recipes, tab: Int) {
+        recipeTab = tab
+        loadRecipes(s)
+    }
+
+    fun searchRecipes(s: Screen.Recipes, q: String) {
+        recipeQuery = q
+        loadRecipes(s)
+    }
+
+    fun loadRecipe(s: Screen.Recipe) {
+        // Das vorige Rezept nicht kurz weiter zeigen, während das neue lädt.
+        if (recipe?.key != s.key) recipe = null
+        run(s.instance) { recipe = client(s.instance).recipe(s.key) }
+    }
+
+    /** Öffentliches Rezept als eigene Kopie übernehmen und zur Kopie wechseln. */
+    fun copyRecipe(s: Screen.Recipe) = run(s.instance) {
+        val kopie = client(s.instance).copyRecipe(s.key)
+        recipe = kopie
+        screen = Screen.Recipe(s.instance, s.me, kopie.key, kopie.title)
+    }
+
+    /** Ziellisten für „In die Einkaufsliste“ laden (dieselben wie auf dem Listenbildschirm). */
+    fun loadShoppingTargets(s: Screen.RecipeShopping) = run(s.instance) {
+        lists = client(s.instance).shoppingLists().results
+    }
+
+    fun loadPreview(s: Screen.RecipeShopping, portionen: Int) = run(s.instance) {
+        preview = client(s.instance).shoppingPreview(s.key, portionen.toString())
+    }
+
+    /**
+     * Gewählte Zeilen in eine bestehende ([listKey]) oder neue ([newTitle]) Liste übernehmen und zur Liste wechseln.
+     * Liste und Titel gehen nie zusammen an den Server.
+     */
+    fun transferToList(s: Screen.RecipeShopping, items: List<ItemInput>, listKey: String?, newTitle: String?) = run(s.instance) {
+        val titel = newTitle?.trim().orEmpty()
+        val ergebnis = client(s.instance).toShoppingList(s.key, listKey, if (listKey == null) titel else null, items)
+        val name = lists.firstOrNull { it.key == ergebnis.listKey }?.title ?: titel.ifBlank { "Einkaufsliste" }
+        screen = Screen.Items(s.instance, s.me, ergebnis.listKey, name)
     }
 }
