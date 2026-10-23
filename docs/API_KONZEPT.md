@@ -1,10 +1,35 @@
 # API-Konzept: Mobile Schnittstelle für HomeCenter
 
-Stand: 2026-10-21 · Status: abgestimmt (siehe Abschnitt 10)
+Stand: 2026-10-23 · Status: **umgesetzt** auf Seite von HomeCenter (siehe „Umsetzungsstand“ unten)
 
 Grundlage ist eine Codeanalyse von `SRyoshi2/HomeCenter` (Django 5.0.7, DRF installiert).
 Alles hier Beschriebene betrifft **HomeCenter** (neue App `mobile_api`), nicht diesen
 Android-Client. Der Client in `hc_app` baut darauf auf.
+
+## Umsetzungsstand
+
+Die Schnittstelle ist in HomeCenter gebaut (Zweig `feature/mobile-api`, Stand `a4b6b75`; danach in `release/0.93` und `master`).
+**Maßgeblich für den Client ist ab jetzt [`API_REFERENZ_HomeCenter.md`](API_REFERENZ_HomeCenter.md)** – sie wird im HomeCenter-Repo aus
+dem Code erzeugt (`manage.py api_referenz`, ein Test hält sie aktuell) und hier als Kopie abgelegt. Die Sicherheitsdurchsicht steht in
+`docs/API_SICHERHEIT.md` im HomeCenter-Repo.
+
+Alle Phasen 0–6 sind umgesetzt, dazu aus Stufe 2: **Freigaben** (Einkaufslisten, OweMe, Rezepte anbieten), **OweMe-Export**,
+**KI-Funktionen** (mit Bestätigung) und **Benachrichtigungen als Abruf**. **Nicht gebaut:** Push per FCM (braucht pro Instanz einen
+zeitgesteuerten Dienst), Tandoor-Import, Veröffentlichen im Social-Feed, Speiseplan und Einkaufsplan.
+
+**Abweichungen vom Konzept unten – im Zweifel gilt die Referenz:**
+
+- Kein `PUT` bei Rezepten, nur `PATCH` (Zutaten und Schritte als Gesamtliste; Einträge mit `id` bleiben erhalten). Rezepte filtern mit
+  `?category=<Name>` (mehrfach), nicht mit der Nummer.
+- `ShoppingItem` hat kein `updated_at`; Delta-Sync bleibt offen.
+- Gewicht und Profil gehen auch **vor** der Aktivierung von Health (die Aktivierung verlangt ein Gewicht); eingeschaltet wird mit
+  `POST /health/profile/enable/` und `{"enabled": true|false}`. Kalorien, Checks, Training und Co. brauchen ein aktives Profil.
+- Bilder: höchstens 10 MB, Dokumente höchstens 25 MB (das Web kennt keine Grenze).
+- Lebensmittel-Vorschläge aus dem Bundeslebensmittelschlüssel (lokale CSV) für die Erfassung: `GET /health/foods/suggest/?q=`.
+- `Laborwerte`: `/health/labs/…` mit Verlauf (`/trend/?name=`), Erfassen am Arztbesuch (`/health/checks/<built-in function id>/labs/`) und der KI-Einordnung
+  mit Prüfsumme des Texts (`/labs/analysis/`).
+- Wochenziele sind **je Sportart** (`/health/training-goals/`, `weekly`), dazu das Langzeitziel (`long_term`).
+- `GET /me/` und `GET /meta/` wie unten beschrieben; `server_version` kommt aus `SERVER_VERSION` (`0.93.1059`).
 
 ## 1. Ziel und Umfang
 
