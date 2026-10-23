@@ -1,0 +1,37 @@
+name: Debug-APK
+
+# Baut ein Test-APK ohne eigenen Signaturschlüssel (Debug-Schlüssel des Runners) zum schnellen Ausprobieren auf dem Handy.
+# Der Debug-Schlüssel wechselt von Lauf zu Lauf: Ein neues Test-APK lässt sich nicht über das alte installieren, das alte
+# muss vorher deinstalliert werden. Für dauerhaft installierbare, aktualisierbare APKs gibt es den Workflow "Release-APK".
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Debug-APK bauen
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Tests (core)
+        if: always()
+        run: ./gradlew :core:test --no-daemon
+
+      - name: APK benennen
+        run: cp app/build/outputs/apk/debug/app-debug.apk "FamilyManager-test-${GITHUB_RUN_NUMBER}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FamilyManager-Test-APK
+          path: FamilyManager-test-*.apk
