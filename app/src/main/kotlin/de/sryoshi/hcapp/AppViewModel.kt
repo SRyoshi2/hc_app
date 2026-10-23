@@ -17,6 +17,24 @@ import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.WeightEntry
+import de.sryoshi.hcapp.core.DocumentCategory
+import de.sryoshi.hcapp.core.HealthCheck
+import de.sryoshi.hcapp.core.HealthCheckPatch
+import de.sryoshi.hcapp.core.HealthDocument
+import de.sryoshi.hcapp.core.LabAnalysis
+import de.sryoshi.hcapp.core.LabOverview
+import de.sryoshi.hcapp.core.LabPatch
+import de.sryoshi.hcapp.core.LabTrend
+import de.sryoshi.hcapp.core.TrafficLight
+import de.sryoshi.hcapp.core.TrainingGoals
+import de.sryoshi.hcapp.core.TrainingGoalsPatch
+import de.sryoshi.hcapp.core.TrainingPatch
+import de.sryoshi.hcapp.core.TrainingReview
+import de.sryoshi.hcapp.core.TrainingTemplate
+import de.sryoshi.hcapp.core.TrainingTemplatePatch
+import de.sryoshi.hcapp.core.Vaccination
+import de.sryoshi.hcapp.core.VaccinationPatch
+import de.sryoshi.hcapp.data.DateiHelfer
 import de.sryoshi.hcapp.core.MealTemplatePatch
 import de.sryoshi.hcapp.core.MealTemplate
 import de.sryoshi.hcapp.core.HealthProfilePatch
@@ -71,6 +89,17 @@ sealed interface Screen {
     data class HealthMonth(val instance: Instance, val me: Me, val month: String) : Screen
     data class HealthWeight(val instance: Instance, val me: Me) : Screen
     data class HealthTemplates(val instance: Instance, val me: Me) : Screen
+    data class HealthChecks(val instance: Instance, val me: Me) : Screen
+    data class HealthCheckDetail(val instance: Instance, val me: Me, val id: Long, val title: String) : Screen
+    data class HealthVaccinations(val instance: Instance, val me: Me) : Screen
+    data class HealthLabs(val instance: Instance, val me: Me) : Screen
+    data class HealthLabTrend(val instance: Instance, val me: Me, val name: String) : Screen
+    /** [week] ist ein beliebiger Tag der Woche (`JJJJ-MM-TT`). */
+    data class HealthTraining(val instance: Instance, val me: Me, val week: String) : Screen
+    data class HealthTrainingTemplates(val instance: Instance, val me: Me) : Screen
+    data class HealthTrainingGoals(val instance: Instance, val me: Me) : Screen
+    /** [source] ist `tracker` oder `plan`. */
+    data class HealthTraffic(val instance: Instance, val me: Me, val week: String, val source: String) : Screen
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -85,6 +114,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var busy by mutableStateOf(false)
         private set
+    /** Kurze Rückmeldung nach einer Aktion (wird als Hinweis eingeblendet und danach verworfen). */
+    var info by mutableStateOf<String?>(null)
+        private set
+    fun clearInfo() { info = null }
     var error by mutableStateOf<String?>(null)
         private set
 
@@ -128,6 +161,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     private var foodJob: Job? = null
 
+    var checks by mutableStateOf<List<HealthCheck>>(emptyList())
+        private set
+    var check by mutableStateOf<HealthCheck?>(null)
+        private set
+    var docKategorien by mutableStateOf<List<DocumentCategory>>(emptyList())
+        private set
+    var impfungen by mutableStateOf<List<Vaccination>>(emptyList())
+        private set
+    var labUebersicht by mutableStateOf<LabOverview?>(null)
+        private set
+    var labVerlauf by mutableStateOf<LabTrend?>(null)
+        private set
+    var labAnalyse by mutableStateOf<LabAnalysis?>(null)
+        private set
+    var trainingWoche by mutableStateOf<TrainingReview?>(null)
+        private set
+    var trainingVorlagen by mutableStateOf<List<TrainingTemplate>>(emptyList())
+        private set
+    var trainingZiele by mutableStateOf<TrainingGoals?>(null)
+        private set
+    var ampel by mutableStateOf<TrafficLight?>(null)
+        private set
+
     var oweMe by mutableStateOf<OweMeOverview?>(null)
         private set
     var konto by mutableStateOf<OweMeAccountDetail?>(null)
@@ -152,6 +208,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.HealthMonth -> Screen.Health(s.instance, s.me)
                 is Screen.HealthWeight -> Screen.Health(s.instance, s.me)
                 is Screen.HealthTemplates -> Screen.Health(s.instance, s.me)
+                is Screen.HealthChecks -> Screen.Health(s.instance, s.me)
+                is Screen.HealthVaccinations -> Screen.Health(s.instance, s.me)
+                is Screen.HealthLabs -> Screen.Health(s.instance, s.me)
+                is Screen.HealthTraining -> Screen.Health(s.instance, s.me)
+                is Screen.HealthTraffic -> Screen.Health(s.instance, s.me)
+                is Screen.HealthCheckDetail -> Screen.HealthChecks(s.instance, s.me)
+                is Screen.HealthLabTrend -> Screen.HealthLabs(s.instance, s.me)
+                is Screen.HealthTrainingTemplates -> Screen.HealthTraining(s.instance, s.me, heute())
+                is Screen.HealthTrainingGoals -> Screen.HealthTraining(s.instance, s.me, heute())
                 is Screen.OweMeUebersicht -> Screen.Home(s.instance, s.me)
                 is Screen.OweMeKonto -> Screen.OweMeUebersicht(s.instance, s.me)
                 is Screen.OweMeRatenplan -> Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
@@ -202,6 +267,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         "validation_error" -> FeldFehler.meldungen(e.fields, beschriftung()).joinToString("\n").ifBlank { e.message }
         "forbidden" -> "Das darf nur der Besitzer."
         "health_not_enabled" -> "Health ist für dein Konto noch nicht eingeschaltet."
+        "training_disabled" -> "Das Training ist in deinem Health-Profil ausgeschaltet."
         else -> e.message
     }
 
@@ -594,6 +660,209 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 emptyList()
             }
         }
+    }
+
+    // ── Health: Arztbesuche, Impfbuch, Labor (Phase 6) ──────────────────
+
+    fun loadChecks(s: Screen.HealthChecks) = run(s.instance) { checks = client(s.instance).healthChecks().results }
+
+    fun saveCheck(s: Screen.HealthChecks, id: Long?, patch: HealthCheckPatch) = run(s.instance) {
+        val api = client(s.instance)
+        if (id == null) api.createHealthCheck(patch) else api.updateHealthCheck(id, patch)
+        checks = api.healthChecks().results
+    }
+
+    fun loadCheck(s: Screen.HealthCheckDetail) {
+        if (check?.id != s.id) check = null
+        run(s.instance) {
+            val api = client(s.instance)
+            check = api.healthCheck(s.id)
+            docKategorien = api.documentCategories().results
+        }
+    }
+
+    fun updateCheck(s: Screen.HealthCheckDetail, patch: HealthCheckPatch) = run(s.instance) {
+        check = client(s.instance).updateHealthCheck(s.id, patch)
+    }
+
+    fun deleteCheck(s: Screen.HealthCheckDetail) = run(s.instance) {
+        client(s.instance).deleteHealthCheck(s.id)
+        check = null
+        screen = Screen.HealthChecks(s.instance, s.me)
+    }
+
+    fun addComment(s: Screen.HealthCheckDetail, text: String) = run(s.instance) {
+        val api = client(s.instance)
+        api.addHealthComment(s.id, text)
+        check = api.healthCheck(s.id)
+    }
+
+    fun deleteComment(s: Screen.HealthCheckDetail, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteHealthComment(id)
+        check = api.healthCheck(s.id)
+    }
+
+    fun uploadDocument(s: Screen.HealthCheckDetail, uri: android.net.Uri, titel: String, kategorie: Long?) = run(s.instance) {
+        val datei = DateiHelfer.lesen(getApplication<Application>(), uri)
+        val api = client(s.instance)
+        api.uploadHealthDocument(s.id, datei.bytes, datei.name, datei.mime, titel.ifBlank { datei.name }, kategorie)
+        check = api.healthCheck(s.id)
+    }
+
+    /** Lädt das Dokument vom Server und schreibt es in die vom Nutzer gewählte Datei [ziel]. */
+    fun saveDocument(s: Screen.HealthCheckDetail, dokument: HealthDocument, ziel: android.net.Uri) = run(s.instance) {
+        val bytes = client(s.instance).downloadHealthDocument(dokument.key)
+        DateiHelfer.schreiben(getApplication<Application>(), ziel, bytes)
+        info = "Gespeichert: ${dokument.filename.ifBlank { dokument.title }}"
+    }
+
+    fun deleteDocument(s: Screen.HealthCheckDetail, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteHealthDocument(id)
+        check = api.healthCheck(s.id)
+    }
+
+    fun createDocCategory(s: Screen.HealthCheckDetail, name: String) = run(s.instance) {
+        val api = client(s.instance)
+        api.createDocumentCategory(name)
+        docKategorien = api.documentCategories().results
+    }
+
+    fun addCheckLab(s: Screen.HealthCheckDetail, patch: LabPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.addLabToCheck(s.id, patch)
+        check = api.healthCheck(s.id)
+    }
+
+    fun updateCheckLab(s: Screen.HealthCheckDetail, id: Long, patch: LabPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateLab(id, patch)
+        check = api.healthCheck(s.id)
+    }
+
+    fun deleteCheckLab(s: Screen.HealthCheckDetail, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteLab(id)
+        check = api.healthCheck(s.id)
+    }
+
+    fun loadVaccinations(s: Screen.HealthVaccinations) = run(s.instance) { impfungen = client(s.instance).vaccinations().results }
+
+    fun saveVaccination(s: Screen.HealthVaccinations, id: Long?, patch: VaccinationPatch) = run(s.instance) {
+        val api = client(s.instance)
+        if (id == null) api.createVaccination(patch) else api.updateVaccination(id, patch)
+        impfungen = api.vaccinations().results
+    }
+
+    fun deleteVaccination(s: Screen.HealthVaccinations, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteVaccination(id)
+        impfungen = api.vaccinations().results
+    }
+
+    fun loadLabs(s: Screen.HealthLabs) = run(s.instance) {
+        val api = client(s.instance)
+        labUebersicht = api.labs()
+        labAnalyse = api.labAnalysis()
+    }
+
+    fun addLab(s: Screen.HealthLabs, patch: LabPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.addLab(patch)
+        labUebersicht = api.labs()
+    }
+
+    fun loadLabTrend(s: Screen.HealthLabTrend) {
+        if (labVerlauf?.name != s.name) labVerlauf = null
+        run(s.instance) { labVerlauf = client(s.instance).labTrend(s.name) }
+    }
+
+    fun updateLab(s: Screen.HealthLabTrend, id: Long, patch: LabPatch) = run(s.instance) {
+        val api = client(s.instance)
+        api.updateLab(id, patch)
+        labVerlauf = api.labTrend(s.name)
+    }
+
+    /** Löscht eine Messung; war es die letzte dieser Bezeichnung, geht es zurück zur Übersicht. */
+    fun deleteLab(s: Screen.HealthLabTrend, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteLab(id)
+        try {
+            labVerlauf = api.labTrend(s.name)
+        } catch (e: ApiException) {
+            if (e.httpStatus != 404) throw e
+            labVerlauf = null
+            screen = Screen.HealthLabs(s.instance, s.me)
+        }
+    }
+
+    // ── Health: Training und Ernährungsampel (Phase 6) ──────────────────
+
+    /** Training im Profil an- oder ausschalten. */
+    fun setTrainingEnabled(s: Screen.Health, an: Boolean) = run(s.instance) {
+        healthProfil = client(s.instance).updateHealthProfile(HealthProfilePatch().trainingEnabled(an))
+    }
+
+    fun loadTrainingWeek(s: Screen.HealthTraining) {
+        if (trainingWoche?.let { s.week in it.weekStart..it.weekEnd } != true) trainingWoche = null
+        run(s.instance) {
+            val api = client(s.instance)
+            trainingWoche = api.trainingReview(week = s.week, month = s.week.take(7))
+            trainingVorlagen = api.trainingTemplates().results
+        }
+    }
+
+    private suspend fun trainingNeu(s: Screen.HealthTraining) {
+        trainingWoche = client(s.instance).trainingReview(week = s.week, month = s.week.take(7))
+    }
+
+    fun addTraining(s: Screen.HealthTraining, patch: TrainingPatch) = run(s.instance) {
+        client(s.instance).addTraining(patch)
+        trainingNeu(s)
+    }
+
+    fun updateTraining(s: Screen.HealthTraining, id: Long, patch: TrainingPatch) = run(s.instance) {
+        client(s.instance).updateTraining(id, patch)
+        trainingNeu(s)
+    }
+
+    fun deleteTraining(s: Screen.HealthTraining, id: Long) = run(s.instance) {
+        client(s.instance).deleteTraining(id)
+        trainingNeu(s)
+    }
+
+    fun applyTrainingTemplate(s: Screen.HealthTraining, id: Long, date: String) = run(s.instance) {
+        client(s.instance).applyTrainingTemplate(id, date)
+        trainingNeu(s)
+    }
+
+    fun loadTrainingTemplates(s: Screen.HealthTrainingTemplates) = run(s.instance) {
+        trainingVorlagen = client(s.instance).trainingTemplates().results
+    }
+
+    fun saveTrainingTemplate(s: Screen.HealthTrainingTemplates, id: Long?, patch: TrainingTemplatePatch) = run(s.instance) {
+        val api = client(s.instance)
+        if (id == null) api.createTrainingTemplate(patch) else api.updateTrainingTemplate(id, patch)
+        trainingVorlagen = api.trainingTemplates().results
+    }
+
+    fun deleteTrainingTemplate(s: Screen.HealthTrainingTemplates, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.deleteTrainingTemplate(id)
+        trainingVorlagen = api.trainingTemplates().results
+    }
+
+    fun loadTrainingGoals(s: Screen.HealthTrainingGoals) = run(s.instance) { trainingZiele = client(s.instance).trainingGoals() }
+
+    fun saveTrainingGoals(s: Screen.HealthTrainingGoals, patch: TrainingGoalsPatch) = run(s.instance) {
+        trainingZiele = client(s.instance).setTrainingGoals(patch)
+        info = "Ziele gespeichert."
+    }
+
+    fun loadTraffic(s: Screen.HealthTraffic) {
+        if (ampel?.let { it.source != s.source || s.week !in it.weekStart..it.weekEnd } != false) ampel = null
+        run(s.instance) { ampel = client(s.instance).trafficLight(s.week, s.source) }
     }
 
     fun clearFoods() {

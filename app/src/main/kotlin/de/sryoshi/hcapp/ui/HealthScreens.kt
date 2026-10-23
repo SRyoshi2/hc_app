@@ -43,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -109,7 +110,7 @@ internal fun Dezimalfeld(wert: String, onChange: (String) -> Unit, label: String
 
 /** Fortschrittsbalken in der Farbe der App. */
 @Composable
-private fun Balken(anteil: Float, farbe: Color) {
+internal fun Balken(anteil: Float, farbe: Color) {
     LinearProgressIndicator(
         progress = { anteil.coerceIn(0f, 1f) }, color = farbe, trackColor = Hc.farben.card2,
         modifier = Modifier.fillMaxWidth().height(8.dp),
@@ -250,11 +251,21 @@ private fun HealthUebersicht(vm: AppViewModel, s: Screen.Health, p: HealthProfil
         item { NavigationsZeile("Kalorientracker – Monatsübersicht") { vm.show(Screen.HealthMonth(s.instance, s.me, LocalDate.now().toString().take(7))) } }
         item { NavigationsZeile("Gewicht") { vm.show(Screen.HealthWeight(s.instance, s.me)) } }
         item { NavigationsZeile("Mahlzeitvorlagen") { vm.show(Screen.HealthTemplates(s.instance, s.me)) } }
+        item { NavigationsZeile("Ernährungsampel") { vm.show(Screen.HealthTraffic(s.instance, s.me, LocalDate.now().toString(), "tracker")) } }
+        item { NavigationsZeile("Arztbesuche") { vm.show(Screen.HealthChecks(s.instance, s.me)) } }
+        item { NavigationsZeile("Impfbuch") { vm.show(Screen.HealthVaccinations(s.instance, s.me)) } }
+        item { NavigationsZeile("Laborwerte") { vm.show(Screen.HealthLabs(s.instance, s.me)) } }
+        if (p.trainingEnabled) item { NavigationsZeile("Training") { vm.show(Screen.HealthTraining(s.instance, s.me, LocalDate.now().toString())) } }
         item {
-            Text(
-                "Gesundheitschecks, Impfbuch, Laborwerte und Training folgen in einer späteren Version der App. Bis dahin findest du sie im Web.",
-                style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted, modifier = Modifier.padding(top = 8.dp),
-            )
+            HcKarte(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Training", style = MaterialTheme.typography.titleMedium)
+                        Text("Einheiten, Wochenziele und Rückblick", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+                    }
+                    Switch(p.trainingEnabled, { vm.setTrainingEnabled(s, it) })
+                }
+            }
         }
     }
 }

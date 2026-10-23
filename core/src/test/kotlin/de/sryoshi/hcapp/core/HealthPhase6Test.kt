@@ -162,7 +162,7 @@ class HealthPhase6Test {
         assertEquals("7.5", t.results[0].distanceKm)
 
         server.enqueue(json("""{"id":2,"date":"2026-03-03"}""", 201))
-        client.addTraining(TrainingPatch().date("2026-03-03").sport("radfahren").minutes(60).intensity("hoch").distanceKm(null))
+        client.addTraining(TrainingPatch().date("2026-03-03").sport("radfahren").minutes(60).intensity("intensiv").distanceKm(null))
         val b = body(server.takeRequest())
         assertEquals(JsonNull, b["distance_km"])
         assertEquals("60", b["minutes"]!!.jsonPrimitive.content)

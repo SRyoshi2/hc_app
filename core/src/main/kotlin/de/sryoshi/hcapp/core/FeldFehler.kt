@@ -24,12 +24,20 @@ object FeldFehler {
         "target_weight_kg" to "Zielgewicht", "target_date" to "Ziel bis", "weight_kg" to "Gewicht",
         "kcal_per_serving" to "kcal je Portion", "month" to "Monat", "enabled" to "Health",
         "training_enabled" to "Training",
+        "doctor" to "Arzt", "visit_date" to "Datum", "visit_time" to "Beginn", "visit_end_time" to "Ende",
+        "duration_hours" to "Dauer", "notes" to "Notizen", "next_due_date" to "Nächster Termin",
+        "next_due_amount" to "Nächster Termin in", "next_due_unit" to "Einheit des nächsten Termins",
+        "follows_up_id" to "Folgetermin von", "last_date" to "Zuletzt", "file" to "Datei", "category_id" to "Kategorie",
+        "value" to "Wert", "ref_from" to "Referenz von", "ref_to" to "Referenz bis",
+        "start_time" to "Beginn", "sport" to "Sportart", "minutes" to "Minuten", "intensity" to "Intensität",
+        "distance_km" to "Strecke", "weekly" to "Wochenziele", "units" to "Einheiten je Woche",
+        "long_term" to "Langzeitziel", "goal_id" to "Ziel", "counts" to "Zählt", "week" to "Woche", "source" to "Quelle",
     )
     /** Beschriftungen, die in OweMe anders lauten als bei Rezepten (`amount`: Menge ↔ Betrag, `note`: Hinweis ↔ Notiz). */
     val OWEME: Map<String, String> = mapOf("title" to "Titel", "amount" to "Betrag", "note" to "Notiz")
 
-    private val BEREICHE = mapOf("ingredients" to "Zutat", "steps" to "Schritt", "items" to "Artikel", "rates" to "Rate")
-    private val LISTENFELD = Regex("""^(ingredients|steps|items|rates)\[(\d+)]\.?(.*)$""")
+    private val BEREICHE = mapOf("ingredients" to "Zutat", "steps" to "Schritt", "items" to "Artikel", "rates" to "Rate", "weekly" to "Wochenziel")
+    private val LISTENFELD = Regex("""^(ingredients|steps|items|rates|weekly)\[(\d+)]\.?(.*)$""")
 
     /**
      * Eine Zeile je Meldung; Reihenfolge wie vom Server. [beschriftung] überschreibt Feldnamen für einen Bereich,
@@ -42,6 +50,8 @@ object FeldFehler {
             val (bereich, index, feld) = treffer.destructured
             val ort = "${BEREICHE.getValue(bereich)} ${index.toInt() + 1}"
             if (feld.isEmpty()) ort else "$ort – ${name(feld)}"
+        } else if ('.' in schluessel) {
+            schluessel.split('.').joinToString(" – ") { name(it) }
         } else {
             name(schluessel)
         }

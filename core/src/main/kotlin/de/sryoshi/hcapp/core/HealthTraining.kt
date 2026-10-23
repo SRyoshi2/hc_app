@@ -40,9 +40,17 @@ data class TrainingTemplate(
     val pace: String? = null,
 )
 
-/** Intensitäten des Servers (`leicht`/`mittel`/`hoch`); die Beschriftung liefert der Server je Einheit mit. */
+/** Intensitäten des Servers; die Beschriftung liefert der Server je Einheit mit. */
 object TrainingIntensity {
-    val alle = listOf("leicht" to "Leicht", "mittel" to "Mittel", "hoch" to "Hoch")
+    val alle = listOf("locker" to "Locker", "mittel" to "Mittel", "intensiv" to "Intensiv")
+}
+
+/** Sportarten des Servers (auch in [GoalOptions.sports] zu lesen); hier als Vorgabe für die Auswahl. */
+object TrainingSports {
+    val alle = listOf(
+        "laufen" to "Laufen", "radfahren" to "Radfahren", "schwimmen" to "Schwimmen", "kraft" to "Kraft / Fitness",
+        "wandern" to "Wandern", "spaziergang" to "Spaziergang", "sonstiges" to "Sonstiges",
+    )
 }
 
 class TrainingPatch : FeldPatch() {

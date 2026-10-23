@@ -29,4 +29,12 @@ class FeldFehlerTest {
     fun `ohne Fehler keine Zeilen`() {
         assertEquals(emptyList(), FeldFehler.meldungen(emptyMap()))
     }
+
+    @Test
+    fun `Wochenziele und Langzeitziel`() {
+        assertEquals(
+            listOf("Wochenziel 2 – Sportart: doppelt", "Langzeitziel – Ziel: ungültig"),
+            FeldFehler.meldungen(mapOf("weekly[1].sport" to listOf("doppelt"), "long_term.goal_id" to listOf("ungültig"))),
+        )
+    }
 }

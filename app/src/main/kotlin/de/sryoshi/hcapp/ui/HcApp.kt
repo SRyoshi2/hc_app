@@ -49,6 +49,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -106,12 +108,27 @@ fun HcApp(vm: AppViewModel) {
         is Screen.HealthMonth -> "Monatsübersicht"
         is Screen.HealthWeight -> "Gewicht"
         is Screen.HealthTemplates -> "Mahlzeitvorlagen"
+        is Screen.HealthChecks -> "Arztbesuche"
+        is Screen.HealthCheckDetail -> s.title
+        is Screen.HealthVaccinations -> "Impfbuch"
+        is Screen.HealthLabs -> "Laborwerte"
+        is Screen.HealthLabTrend -> s.name
+        is Screen.HealthTraining -> "Training"
+        is Screen.HealthTrainingTemplates -> "Trainingsvorlagen"
+        is Screen.HealthTrainingGoals -> "Trainingsziele"
+        is Screen.HealthTraffic -> "Ernährungsampel"
     }
     val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
     val zurueck = s !is Screen.Instances && !(s is Screen.AddInstance && vm.instances.isEmpty())
 
+    val hinweise = remember { SnackbarHostState() }
+    LaunchedEffect(vm.info) {
+        vm.info?.let { hinweise.showSnackbar(it); vm.clearInfo() }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hinweise) },
         topBar = {
             TopAppBar(
                 title = { Text(titel, fontWeight = FontWeight.SemiBold) },
@@ -148,6 +165,15 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.HealthMonth -> HealthMonthScreen(vm, s)
                 is Screen.HealthWeight -> HealthWeightScreen(vm, s)
                 is Screen.HealthTemplates -> HealthTemplatesScreen(vm, s)
+                is Screen.HealthChecks -> HealthChecksScreen(vm, s)
+                is Screen.HealthCheckDetail -> HealthCheckScreen(vm, s)
+                is Screen.HealthVaccinations -> HealthVaccinationsScreen(vm, s)
+                is Screen.HealthLabs -> HealthLabsScreen(vm, s)
+                is Screen.HealthLabTrend -> HealthLabTrendScreen(vm, s)
+                is Screen.HealthTraining -> HealthTrainingScreen(vm, s)
+                is Screen.HealthTrainingTemplates -> HealthTrainingTemplatesScreen(vm, s)
+                is Screen.HealthTrainingGoals -> HealthTrainingGoalsScreen(vm, s)
+                is Screen.HealthTraffic -> HealthTrafficScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
