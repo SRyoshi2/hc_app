@@ -161,6 +161,7 @@ data class FoodSuggestion(
 )
 
 /** Der Server liefert Gramm als Text (`"13.2"`), `null` bei fehlender Angabe; eine echte Zahl wird ebenfalls gelesen. */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 internal object GrammSerializer : KSerializer<Double?> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Gramm", PrimitiveKind.STRING)
 

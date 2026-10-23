@@ -96,6 +96,7 @@ class HealthPhase6Test {
         server.enqueue(MockResponse().setResponseCode(404).setBody("{\"error\":{\"code\":\"not_found\",\"message\":\"x\"}}"))
         assertEquals("not_found", assertFailsWith<ApiException> { client.downloadHealthDocument("zz") }.code)
 
+        server.takeRequest() // fehlgeschlagener Download
         server.enqueue(MockResponse().setResponseCode(204))
         client.deleteHealthDocument(4)
         assertEquals("DELETE /api/v1/health/documents/4/", server.takeRequest().let { "${it.method} ${it.path}" })
@@ -189,6 +190,7 @@ class HealthPhase6Test {
         assertEquals(3, z.weekly[0].units)
         assertEquals(10, z.longTerm.state?.percent)
         assertEquals("laufen", z.options.sports[0].value)
+        server.takeRequest() // Lesen
 
         server.enqueue(json(antwort))
         client.setTrainingGoals(TrainingGoalsPatch().weekly(listOf(WeeklyGoal(sport = "laufen", units = 2))).goalId(null))

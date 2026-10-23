@@ -21,7 +21,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      # Das Android-SDK ist auf den GitHub-Runnern vorinstalliert (ANDROID_HOME); android-actions/setup-android scheitert
+      # derzeit an "Failed to find package 'tools'". Fehlende Pakete lädt Gradle selbst nach.
+      - name: Lizenzen akzeptieren
+        run: yes | "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
       - uses: gradle/actions/setup-gradle@v4
 
