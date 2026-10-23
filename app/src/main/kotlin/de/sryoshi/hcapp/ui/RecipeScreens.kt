@@ -104,6 +104,9 @@ fun RecipesScreen(vm: AppViewModel, s: Screen.Recipes) {
                 keyboardActions = KeyboardActions(onSearch = { vm.searchRecipes(s, suche) }),
             )
             ErrorText(vm)
+            if (vm.recipeTab == 0) {
+                TextButton(onClick = { vm.show(Screen.RecipeOffers(s.instance, s.me)) }) { Text("Angebote anderer ansehen") }
+            }
             if (vm.recipes.isEmpty() && !vm.busy) {
                 Text(
                     when {
@@ -219,6 +222,11 @@ private fun Aktionen(vm: AppViewModel, s: Screen.Recipe, r: RecipeDetail) {
         if (!r.isOwner) {
             OutlinedButton(onClick = { vm.copyRecipe(s) }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
                 Text("Als eigenes Rezept übernehmen")
+            }
+        }
+        if (r.isOwner) {
+            OutlinedButton(onClick = { vm.teilenOeffnen(s.instance, "recipe", r.key, r.title) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Anderen Benutzern anbieten")
             }
         }
         if (r.canEdit) {

@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -48,6 +50,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -117,6 +121,8 @@ fun HcApp(vm: AppViewModel) {
         is Screen.HealthTrainingTemplates -> "Trainingsvorlagen"
         is Screen.HealthTrainingGoals -> "Trainingsziele"
         is Screen.HealthTraffic -> "Ernährungsampel"
+        is Screen.RecipeOffers -> "Rezept-Angebote"
+        is Screen.Notifications -> "Meldungen"
     }
     val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
@@ -137,6 +143,15 @@ fun HcApp(vm: AppViewModel) {
                         IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
                     }
                 },
+                actions = {
+                    if (s is Screen.Home) {
+                        IconButton(onClick = { vm.show(Screen.Notifications(s.instance, s.me)) }) {
+                            BadgedBox(badge = { if (vm.ungelesen > 0) Badge { Text(vm.ungelesen.toString()) } }) {
+                                Icon(Icons.Default.Notifications, "Meldungen")
+                            }
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = kopfFarbe, titleContentColor = kopfText,
                     navigationIconContentColor = kopfText, actionIconContentColor = kopfText,
@@ -145,6 +160,7 @@ fun HcApp(vm: AppViewModel) {
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
+        vm.teilen?.let { TeilenDialog(vm, it) }
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (s) {
                 Screen.Instances -> InstancesScreen(vm)
@@ -174,6 +190,8 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.HealthTrainingTemplates -> HealthTrainingTemplatesScreen(vm, s)
                 is Screen.HealthTrainingGoals -> HealthTrainingGoalsScreen(vm, s)
                 is Screen.HealthTraffic -> HealthTrafficScreen(vm, s)
+                is Screen.RecipeOffers -> RecipeOffersScreen(vm, s)
+                is Screen.Notifications -> NotificationsScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
@@ -309,6 +327,7 @@ private val APPS = listOf(
  */
 @Composable
 private fun HomeScreen(vm: AppViewModel, s: Screen.Home) {
+    LaunchedEffect(s) { vm.loadUnread(s.instance) }
     var suche by rememberSaveable { mutableStateOf("") }
     val office = s.instance.mode == "office"
     val sichtbar = APPS
@@ -425,6 +444,7 @@ private fun ListsScreen(vm: AppViewModel, s: Screen.Lists) {
                                 )
                             }
                             if (l.isOwner) {
+                                IconButton(onClick = { vm.teilenOeffnen(s.instance, "list", l.key, l.title) }) { Icon(Icons.Default.Share, "Liste teilen") }
                                 IconButton(onClick = { loeschen = l }) { Icon(Icons.Default.Delete, "Liste löschen") }
                             }
                         }

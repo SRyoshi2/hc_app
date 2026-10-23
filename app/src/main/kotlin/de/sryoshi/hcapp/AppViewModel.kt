@@ -17,6 +17,9 @@ import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.WeightEntry
+import de.sryoshi.hcapp.core.AppNotification
+import de.sryoshi.hcapp.core.RecipeOffer
+import de.sryoshi.hcapp.core.ShareUser
 import de.sryoshi.hcapp.core.DocumentCategory
 import de.sryoshi.hcapp.core.HealthCheck
 import de.sryoshi.hcapp.core.HealthCheckPatch
@@ -98,9 +101,16 @@ sealed interface Screen {
     data class HealthTraining(val instance: Instance, val me: Me, val week: String) : Screen
     data class HealthTrainingTemplates(val instance: Instance, val me: Me) : Screen
     data class HealthTrainingGoals(val instance: Instance, val me: Me) : Screen
+    data class RecipeOffers(val instance: Instance, val me: Me) : Screen
+    data class Notifications(val instance: Instance, val me: Me) : Screen
     /** [source] ist `tracker` oder `plan`. */
     data class HealthTraffic(val instance: Instance, val me: Me, val week: String, val source: String) : Screen
 }
+
+/** Wem wird was geteilt: [art] ist `list`, `oweme` oder `recipe` (Anbieten); [bekannt] sind die bisherigen Empfänger. */
+class TeilenZustand(
+    val instance: Instance, val art: String, val key: String, val titel: String, val bekannt: List<ShareUser>,
+)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = InstanceStore(app)
@@ -184,6 +194,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var ampel by mutableStateOf<TrafficLight?>(null)
         private set
 
+    /** Zustand des Teilen-Dialogs; `null`, wenn keiner offen ist. */
+    var teilen by mutableStateOf<TeilenZustand?>(null)
+        private set
+    var teilBenutzer by mutableStateOf<List<ShareUser>>(emptyList())
+        private set
+    var angebote by mutableStateOf<List<RecipeOffer>>(emptyList())
+        private set
+    var meldungen by mutableStateOf<List<AppNotification>>(emptyList())
+        private set
+    var ungelesen by mutableStateOf(0)
+        private set
+
     var oweMe by mutableStateOf<OweMeOverview?>(null)
         private set
     var konto by mutableStateOf<OweMeAccountDetail?>(null)
@@ -217,6 +239,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.HealthLabTrend -> Screen.HealthLabs(s.instance, s.me)
                 is Screen.HealthTrainingTemplates -> Screen.HealthTraining(s.instance, s.me, heute())
                 is Screen.HealthTrainingGoals -> Screen.HealthTraining(s.instance, s.me, heute())
+                is Screen.RecipeOffers -> Screen.Recipes(s.instance, s.me)
+                is Screen.Notifications -> Screen.Home(s.instance, s.me)
                 is Screen.OweMeUebersicht -> Screen.Home(s.instance, s.me)
                 is Screen.OweMeKonto -> Screen.OweMeUebersicht(s.instance, s.me)
                 is Screen.OweMeRatenplan -> Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
@@ -863,6 +887,110 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadTraffic(s: Screen.HealthTraffic) {
         if (ampel?.let { it.source != s.source || s.week !in it.weekStart..it.weekEnd } != false) ampel = null
         run(s.instance) { ampel = client(s.instance).trafficLight(s.week, s.source) }
+    }
+
+    // ── Teilen, Export, Meldungen (Phase 7) ─────────────────────────────
+
+    /** Öffnet den Teilen-Dialog; bei Liste und Konto mit der bisherigen Freigabe, bei Rezepten (Anbieten) ohne. */
+    fun teilenOeffnen(instance: Instance, art: String, key: String, titel: String) = run(instance) {
+        val api = client(instance)
+        val bekannt = when (art) {
+            "list" -> api.listSharing(key).users
+            "oweme" -> api.oweMeSharing(key).users
+            else -> emptyList()
+        }
+        teilBenutzer = api.shareUsers().results
+        teilen = TeilenZustand(instance, art, key, titel, bekannt)
+    }
+
+    fun benutzerSuchen(q: String) {
+        val z = teilen ?: return
+        run(z.instance) { teilBenutzer = client(z.instance).shareUsers(q).results }
+    }
+
+    fun teilenSchliessen() { teilen = null; teilBenutzer = emptyList() }
+
+    fun teilenSpeichern(ids: List<Long>) {
+        val z = teilen ?: return
+        teilenSchliessen()
+        run(z.instance) {
+            val api = client(z.instance)
+            when (z.art) {
+                "list" -> { api.setListSharing(z.key, ids); lists = api.shoppingLists().results; info = "Freigabe gespeichert." }
+                "oweme" -> { api.setOweMeSharing(z.key, ids); info = "Freigabe gespeichert." }
+                else -> {
+                    val r = api.shareRecipe(z.key, ids)
+                    info = when {
+                        r.offered == 0 && r.alreadyOffered > 0 -> "Schon angeboten."
+                        r.alreadyOffered > 0 -> "${r.offered} angeboten, ${r.alreadyOffered} hatten es schon."
+                        else -> "${r.offered} angeboten."
+                    }
+                }
+            }
+        }
+    }
+
+    /** Kontoauszug als CSV vom Server holen und in die gewählte Datei schreiben. */
+    fun exportOweMe(s: Screen.OweMeKonto, ziel: android.net.Uri) = run(s.instance) {
+        val bytes = client(s.instance).exportOweMe(s.key)
+        DateiHelfer.schreiben(getApplication<Application>(), ziel, bytes)
+        info = "Kontoauszug gespeichert."
+    }
+
+    fun loadOffers(s: Screen.RecipeOffers) = run(s.instance) { angebote = client(s.instance).recipeOffers().results }
+
+    fun acceptOffer(s: Screen.RecipeOffers, angebot: RecipeOffer) = run(s.instance) {
+        val kopie = client(s.instance).acceptRecipeOffer(angebot.id)
+        angebote = angebote.filter { it.id != angebot.id }
+        recipe = kopie
+        info = "„${kopie.title}“ ist jetzt in deinen Rezepten."
+        screen = Screen.Recipe(s.instance, s.me, kopie.key, kopie.title)
+    }
+
+    fun declineOffer(s: Screen.RecipeOffers, angebot: RecipeOffer) = run(s.instance) {
+        client(s.instance).declineRecipeOffer(angebot.id)
+        angebote = angebote.filter { it.id != angebot.id }
+    }
+
+    /** Zähler für die Glocke; Störungen bleiben still (kein Grund für eine Fehlermeldung auf der Startseite). */
+    fun loadUnread(instance: Instance) {
+        viewModelScope.launch {
+            ungelesen = try { client(instance).unreadCount() } catch (e: ApiException) { 0 }
+        }
+    }
+
+    fun loadNotifications(s: Screen.Notifications) = run(s.instance) {
+        val seite = client(s.instance).notifications()
+        meldungen = seite.results
+        ungelesen = seite.unreadCount
+    }
+
+    /** Markiert als gelesen und öffnet das Ziel, soweit die App es kennt. */
+    fun openNotification(s: Screen.Notifications, m: AppNotification) = run(s.instance) {
+        if (!m.read) {
+            client(s.instance).markNotificationRead(m.id)
+            meldungen = meldungen.map { if (it.id == m.id) it.copy(read = true) else it }
+            ungelesen = (ungelesen - 1).coerceAtLeast(0)
+        }
+        val t = m.target ?: return@run
+        screen = when (t.kind) {
+            "shopping_list" -> Screen.Items(s.instance, s.me, t.key, "Einkaufsliste")
+            "oweme_account" -> Screen.OweMeKonto(s.instance, s.me, t.key, "Konto")
+            "recipe" -> Screen.Recipe(s.instance, s.me, t.key, "Rezept")
+            else -> return@run
+        }
+    }
+
+    fun markAllRead(s: Screen.Notifications) = run(s.instance) {
+        client(s.instance).markAllNotificationsRead()
+        meldungen = meldungen.map { it.copy(read = true) }
+        ungelesen = 0
+    }
+
+    fun deleteNotification(s: Screen.Notifications, m: AppNotification) = run(s.instance) {
+        client(s.instance).deleteNotification(m.id)
+        meldungen = meldungen.filter { it.id != m.id }
+        if (!m.read) ungelesen = (ungelesen - 1).coerceAtLeast(0)
     }
 
     fun clearFoods() {

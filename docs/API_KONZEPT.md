@@ -400,8 +400,16 @@ Hinweise:
 - Sportarten und Intensitäten (`locker`/`mittel`/`intensiv`) sind im Client als Auswahl hinterlegt; Sportarten stehen zusätzlich
   in `training-goals/` unter `options`.
 
-## 13. Phase 7 (Server fertig, App folgt)
+## 13. Phase 7 (umgesetzt)
 
-Benutzerliste, Einkaufslisten und OweMe-Konten teilen, Rezepte anbieten/annehmen, OweMe-CSV-Export und Benachrichtigungen
-sind auf dem Server vorhanden (`freigaben.py`, `benachrichtigungen.py`). Die App nutzt sie noch nicht.
+Server: `mobile_api/freigaben.py`, `benachrichtigungen.py`.
 
+- **Benutzerliste** `users/?q=`: aktive Benutzer ohne einen selbst. **Freigabe** `PUT shopping-lists/<key>/sharing/` und
+  `oweme/accounts/<key>/sharing/` mit `{"user_ids": [...]}` ersetzt die Freigabe (nur Besitzer); Fehler je Stelle (`user_ids[0]`).
+  Die App zeigt die Benutzer mit Häkchen; Abwählen beendet die Freigabe.
+- **Rezepte** `POST recipes/<key>/share/` bietet an (`offered`, `already_offered`); `recipe-shares/` listet Angebote an dich,
+  `…/<id>/accept/` übernimmt als eigene Kopie, `…/decline/` lehnt ab.
+- **Export** `GET oweme/accounts/<key>/export/` liefert CSV (Semikolon, BOM); die App speichert über „Datei erstellen“.
+- **Meldungen** `notifications/` (+ `unread-count/`, `<id>/read/`, `read-all/`, `DELETE <id>/`): Abruf statt Push (FCM bräuchte
+  einen zeitgesteuerten Dienst). Der erste Abruf am Tag lässt den Server fällige OweMe-Erinnerungen erzeugen. Die App holt den
+  Zähler beim Öffnen der Startseite; ein Tipp markiert als gelesen und öffnet Liste, Konto oder Rezept (`target`).

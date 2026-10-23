@@ -277,6 +277,9 @@ fun OweMeKontoScreen(vm: AppViewModel, s: Screen.OweMeKonto) {
     var bearbeiteBewegung by remember { mutableStateOf<OweMeEntry?>(null) }
     var kontoBearbeiten by remember { mutableStateOf(false) }
     var loeschen by remember { mutableStateOf(false) }
+    val exportieren = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri -> if (uri != null) vm.exportOweMe(s, uri) }
 
     if (d == null) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -337,6 +340,12 @@ fun OweMeKontoScreen(vm: AppViewModel, s: Screen.OweMeKonto) {
         if (k.isOwner) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    OutlinedButton(onClick = { vm.teilenOeffnen(s.instance, "oweme", k.key, s.title) }, modifier = Modifier.weight(1f)) { Text("Teilen") }
+                    OutlinedButton(onClick = { exportieren.launch("${s.title.ifBlank { "Konto" }}.csv") }, modifier = Modifier.weight(1f)) { Text("CSV-Export") }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { kontoBearbeiten = true }, modifier = Modifier.weight(1f)) { Text("Konto bearbeiten") }
                     TextButton(onClick = { loeschen = true }, modifier = Modifier.weight(1f)) { Text("Konto löschen", color = MaterialTheme.colorScheme.error) }
                 }

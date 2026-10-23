@@ -376,6 +376,63 @@ class ApiClient(
             add("source" to source); week?.let { add("week" to it) }
         }.toTypedArray())
 
+    // ── Teilen, Export, Benachrichtigungen (Phase 7) ────────────────────
+
+    /** Benutzer, mit denen sich teilen lässt (ohne dich selbst); [q] sucht in Benutzername und Nickname. */
+    suspend fun shareUsers(q: String = "", limit: Int = 200): Page<ShareUser> =
+        get("users/", *buildList { add("limit" to limit.toString()); if (q.isNotBlank()) add("q" to q.trim()) }.toTypedArray())
+
+    suspend fun listSharing(key: String): SharingState = get("shopping-lists/$key/sharing/")
+
+    /** Ersetzt die Freigabe der Liste (nur der Besitzer). */
+    suspend fun setListSharing(key: String, userIds: List<Long>): SharingState =
+        send("PUT", "shopping-lists/$key/sharing/", userIdsJson(userIds))
+
+    suspend fun oweMeSharing(key: String): SharingState = get("oweme/accounts/$key/sharing/")
+
+    suspend fun setOweMeSharing(key: String, userIds: List<Long>): SharingState =
+        send("PUT", "oweme/accounts/$key/sharing/", userIdsJson(userIds))
+
+    /** Kontoauszug als CSV (Semikolon, mit BOM) wie im Web. */
+    suspend fun exportOweMe(key: String): ByteArray = herunterladen("oweme/accounts/$key/export/")
+
+    suspend fun shareRecipe(key: String, userIds: List<Long>): RecipeShareResult =
+        post("recipes/$key/share/", userIdsJson(userIds))
+
+    suspend fun recipeOffers(): Page<RecipeOffer> = get("recipe-shares/", "limit" to "200")
+
+    /** Übernimmt das Angebot als eigene Kopie. */
+    suspend fun acceptRecipeOffer(id: Long): RecipeDetail = post("recipe-shares/$id/accept/", null)
+
+    suspend fun declineRecipeOffer(id: Long) { ausfuehren(anfrage("POST", "recipe-shares/$id/decline/", null)) }
+
+    /** Meldungen, neueste zuerst. Der erste Abruf des Tages lässt den Server fällige OweMe-Erinnerungen erzeugen. */
+    suspend fun notifications(unreadOnly: Boolean = false, limit: Int = 100): NotificationPage =
+        get("notifications/", *buildList { add("limit" to limit.toString()); if (unreadOnly) add("unread" to "1") }.toTypedArray())
+
+    suspend fun unreadCount(): Int = get<UnreadCount>("notifications/unread-count/").unreadCount
+
+    suspend fun markNotificationRead(id: Long): AppNotification = post("notifications/$id/read/", null)
+
+    suspend fun markAllNotificationsRead(): Int = post<MarkedCount>("notifications/read-all/", null).marked
+
+    suspend fun deleteNotification(id: Long) = ohneAntwort("DELETE", "notifications/$id/")
+
+    private fun userIdsJson(ids: List<Long>): JsonObject =
+        JsonObject(mapOf("user_ids" to JsonArray(ids.distinct().map { JsonPrimitive(it) })))
+
+    private suspend fun herunterladen(pfad: String): ByteArray = withContext(Dispatchers.IO) {
+        val request = anfrage("GET", pfad, null).newBuilder().removeHeader("Accept").build()
+        try {
+            http.newCall(request).execute().use { r ->
+                if (!r.isSuccessful) throw fehler(r.code, r.body?.string().orEmpty())
+                r.body?.bytes() ?: ByteArray(0)
+            }
+        } catch (e: IOException) {
+            throw ApiException(ApiException.NETWORK, "Die Instanz ist nicht erreichbar.", cause = e)
+        }
+    }
+
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {
             add("limit" to limit.toString())
