@@ -371,3 +371,37 @@ Gewünscht (Phase 5b):
   einbauen und dort durchsuchen. Das verdoppelt die Suchlogik, hält die Daten außerhalb der Instanz und funktioniert offline;
   empfohlen wird es nicht.
 
+### Stand: umgesetzt
+
+Der Endpunkt ist da, mit anderer Form als oben gewünscht: `GET /health/foods/suggest/?q=<Text>&limit=<n>` liefert
+`{"count", "results": [{code, name, kcal_100g, protein_100g, fat_100g, carbs_100g}]}`; Gramm sind Text (`"13.2"`) oder `null`.
+Die App liest diese Form (`GrammSerializer` akzeptiert Text und Zahl) und zeigt die Quelle unter den Vorschlägen.
+
+## 12. Health, Phase 6 (umgesetzt)
+
+Server: `mobile_api/health_checks.py`, `health_labor.py`, `health_training.py` (Branch `feature/mobile-api`).
+
+| Bereich | Endpunkte | In der App |
+|---|---|---|
+| Arztbesuche | `health/checks/`, `…/<id>/` (Liste, Anlegen, Detail mit Laborwerten/Dokumenten/Kommentaren, Ändern, Löschen) | Liste, Detail, Dialog; Fälligkeit („nächster Termin“ als Datum oder Zeitraum) |
+| Dokumente | `health/checks/<id>/documents/` (multipart `file`, `title`, `category_id`), `health/documents/<key>/` (Download nur mit Token), `DELETE …/<id>/`, `health/document-categories/` | Auswahl per Dateiwähler (höchstens 25 MB), Speichern über „Datei erstellen“, Kategorien anlegen |
+| Kommentare | `health/checks/<id>/comments/`, `health/comments/<id>/` | Liste, Senden, Löschen |
+| Impfbuch | `health/vaccinations/` | Liste, Dialog, Fälligkeit |
+| Laborwerte | `health/labs/` (je Bezeichnung neueste Messung), `…/trend/?name=`, `…/<id>/`, `health/checks/<id>/labs/`, `health/labs/analysis/` | Übersicht mit Einordnung gegen den Bereich der Messung, Verlauf mit Linie und Referenzband, Erfassen/Ändern/Löschen; KI-Einordnung nur lesen |
+| Training | `health/trainings/`, `training-templates/` (+ `apply/<tag>/`), `training-goals/` (PUT), `training/review/` | Wochenansicht mit Summen, Wochenzielen, Belastung, Monat; Einheiten, Vorlagen, Wochen- und Langzeitziele |
+| Ernährungsampel | `health/traffic-light/?week=&source=tracker\|plan` | Wochen- und Tagesampel mit Kriterien |
+
+Hinweise:
+
+- Das Training lässt sich im Profil abschalten; dann antwortet der Server mit 403 `training_disabled`. Die App zeigt den
+  Eintrag „Training“ nur bei eingeschaltetem Training und hat dafür einen Schalter in der Health-Übersicht.
+- KI-Texte (Laboreinordnung, Wochenrückblick, Ernährungseinschätzung) liest die App nur, wenn sie abgelegt sind; sie zu
+  erzeugen bleibt im Web (Bestätigung des angezeigten Textes). Die App kennzeichnet sie als Schätzung ohne ärztliche Beratung.
+- Sportarten und Intensitäten (`locker`/`mittel`/`intensiv`) sind im Client als Auswahl hinterlegt; Sportarten stehen zusätzlich
+  in `training-goals/` unter `options`.
+
+## 13. Phase 7 (Server fertig, App folgt)
+
+Benutzerliste, Einkaufslisten und OweMe-Konten teilen, Rezepte anbieten/annehmen, OweMe-CSV-Export und Benachrichtigungen
+sind auf dem Server vorhanden (`freigaben.py`, `benachrichtigungen.py`). Die App nutzt sie noch nicht.
+

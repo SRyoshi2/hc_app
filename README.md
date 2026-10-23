@@ -19,7 +19,8 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | OweMe: Person aus Adressbuch oder HomeCenter-Benutzer wählen, Konto teilen, Export | nicht in der App (Name wird frei eingegeben) |
 | Health: Einrichten (Profil, Gewicht, einschalten), Übersicht (Heute, Kennzahlen, Ziel), Kalorientracker (Tag mit Bilanz und Ampel, Monatskalender, Mahlzeiten erfassen/ändern/löschen), Portionsrechner (Werte je 100 g + gegessene Gramm → kcal und Nährwerte), Gewicht mit Zielgewicht, Mahlzeitvorlagen | umgesetzt (API Phase 5) |
 | Lebensmittel-Vorschläge beim Tippen (Bundeslebensmittelschlüssel) | App fertig, wartet auf den Endpunkt `GET /health/foods/` (siehe Konzept, Abschnitt 11) |
-| Health: Gesundheitschecks, Impfbuch, Laborwerte, Training, Ampel | wartet auf API-Phase 6 |
+| Health: Arztbesuche mit Dokumenten (Hochladen/Herunterladen) und Kommentaren, Impfbuch, Laborwerte mit Verlauf, Training (Einheiten, Vorlagen, Wochen-/Langzeitziele, Rückblick), Ernährungsampel; Lebensmittelvorschläge (BLS) im Kalorientracker | umgesetzt (API Phase 6) |
+| Teilen (Listen, OweMe-Konten, Rezepte), Benachrichtigungen, OweMe-Export | Server fertig (API Phase 7), App folgt |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die
 Entwicklungsumgebung, in der der Code entstand, erreicht Maven Central und Google Maven nicht
@@ -91,5 +92,5 @@ Release derselbe sein.
 
 ## Voraussetzung auf der Instanz
 
-Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 5).
+Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 6).
 Ältere Instanzen melden „unterstützt die App noch nicht“.
