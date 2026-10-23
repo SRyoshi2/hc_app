@@ -223,11 +223,11 @@ class HealthApiTest {
 
     @Test
     fun `Lebensmittelvorschlaege`() = runTest {
-        server.enqueue(json("""{"suggestions":[
-            {"code":"C133000","name":"Hafer Flocken","kcal_100g":348,"protein_100g":13.2,"fat_100g":6.7,"carbs_100g":53.3},
+        server.enqueue(json("""{"count":2,"results":[
+            {"code":"C133000","name":"Hafer Flocken","kcal_100g":348,"protein_100g":"13.2","fat_100g":"6.7","carbs_100g":"53.3"},
             {"code":"X1","name":"Wasser","kcal_100g":0,"protein_100g":null,"fat_100g":null,"carbs_100g":null}]}"""))
         val v = client.searchFoods("  hafer flocken ")
-        assertEquals("/api/v1/health/foods/?q=hafer%20flocken", server.takeRequest().path)
+        assertEquals("/api/v1/health/foods/suggest/?q=hafer%20flocken", server.takeRequest().path)
         assertEquals(2, v.size)
         assertEquals(348, v[0].kcal100g)
         assertEquals(13.2, v[0].protein100g)

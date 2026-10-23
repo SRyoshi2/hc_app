@@ -247,7 +247,134 @@ class ApiClient(
      * Instanz nicht, wirft der Aufruf eine [ApiException] – der Aufrufer zeigt dann einfach keine Vorschläge.
      */
     suspend fun searchFoods(q: String): List<FoodSuggestion> =
-        get<FoodSuggestions>("health/foods/", "q" to q.trim()).suggestions
+        get<FoodSuggestions>("health/foods/suggest/", "q" to q.trim()).results
+
+    // ── Health: Arztbesuche, Dokumente, Impfbuch, Labor (Phase 6) ───────
+
+    suspend fun healthChecks(limit: Int = 200, offset: Int = 0): Page<HealthCheck> =
+        get("health/checks/", "limit" to limit.toString(), "offset" to offset.toString())
+
+    suspend fun healthCheck(id: Long): HealthCheck = get("health/checks/$id/")
+
+    suspend fun createHealthCheck(patch: HealthCheckPatch): HealthCheck = post("health/checks/", patch.alsJson())
+
+    suspend fun updateHealthCheck(id: Long, patch: HealthCheckPatch): HealthCheck = send("PATCH", "health/checks/$id/", patch.alsJson())
+
+    suspend fun deleteHealthCheck(id: Long) = ohneAntwort("DELETE", "health/checks/$id/")
+
+    /** Datei an einen Arztbesuch hängen (höchstens 25 MB, der Server prüft). [categoryId] ist optional. */
+    suspend fun uploadHealthDocument(
+        checkId: Long, datei: ByteArray, dateiname: String, mimeType: String, title: String, categoryId: Long? = null,
+    ): HealthDocument {
+        val teile = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", dateiname, datei.toRequestBody(mimeType.toMediaType()))
+            .addFormDataPart("title", title)
+            .apply { if (categoryId != null) addFormDataPart("category_id", categoryId.toString()) }
+            .build()
+        val url = basis.newBuilder().addPathSegments("api/v1/health/checks/$checkId/documents/").build()
+        val request = Request.Builder().url(url).post(teile).header("Accept", "application/json")
+            .apply { token()?.let { header("Authorization", "Bearer $it") } }
+            .build()
+        return antwort(request)
+    }
+
+    /** Lädt die Datei eines Dokuments (nur mit Token; es gibt keine öffentliche Adresse). */
+    suspend fun downloadHealthDocument(key: String): ByteArray = withContext(Dispatchers.IO) {
+        val url = basis.newBuilder().addPathSegments("api/v1/health/documents/$key/").build()
+        val request = Request.Builder().url(url).get()
+            .apply { token()?.let { header("Authorization", "Bearer $it") } }
+            .build()
+        try {
+            http.newCall(request).execute().use { r ->
+                if (!r.isSuccessful) throw fehler(r.code, r.body?.string().orEmpty())
+                r.body?.bytes() ?: ByteArray(0)
+            }
+        } catch (e: IOException) {
+            throw ApiException(ApiException.NETWORK, "Die Instanz ist nicht erreichbar.", cause = e)
+        }
+    }
+
+    suspend fun deleteHealthDocument(id: Long) = ohneAntwort("DELETE", "health/documents/$id/")
+
+    suspend fun addHealthComment(checkId: Long, text: String): HealthComment =
+        post("health/checks/$checkId/comments/", obj("text" to text))
+
+    suspend fun deleteHealthComment(id: Long) = ohneAntwort("DELETE", "health/comments/$id/")
+
+    suspend fun documentCategories(): Page<DocumentCategory> = get("health/document-categories/", "limit" to "200")
+
+    suspend fun createDocumentCategory(name: String): DocumentCategory = post("health/document-categories/", obj("name" to name))
+
+    suspend fun deleteDocumentCategory(id: Long) = ohneAntwort("DELETE", "health/document-categories/$id/")
+
+    suspend fun vaccinations(limit: Int = 200, offset: Int = 0): Page<Vaccination> =
+        get("health/vaccinations/", "limit" to limit.toString(), "offset" to offset.toString())
+
+    suspend fun createVaccination(patch: VaccinationPatch): Vaccination = post("health/vaccinations/", patch.alsJson())
+
+    suspend fun updateVaccination(id: Long, patch: VaccinationPatch): Vaccination =
+        send("PATCH", "health/vaccinations/$id/", patch.alsJson())
+
+    suspend fun deleteVaccination(id: Long) = ohneAntwort("DELETE", "health/vaccinations/$id/")
+
+    suspend fun labs(limit: Int = 200, offset: Int = 0): LabOverview =
+        get("health/labs/", "limit" to limit.toString(), "offset" to offset.toString())
+
+    suspend fun labTrend(name: String): LabTrend = get("health/labs/trend/", "name" to name)
+
+    suspend fun addLab(patch: LabPatch): LabMeasurement = post("health/labs/", patch.alsJson())
+
+    /** Messung am Arztbesuch erfassen (Herkunft = der Besuch). */
+    suspend fun addLabToCheck(checkId: Long, patch: LabPatch): LabMeasurement = post("health/checks/$checkId/labs/", patch.alsJson())
+
+    suspend fun updateLab(id: Long, patch: LabPatch): LabMeasurement = send("PATCH", "health/labs/$id/", patch.alsJson())
+
+    suspend fun deleteLab(id: Long) = ohneAntwort("DELETE", "health/labs/$id/")
+
+    /** Die abgelegte KI-Einordnung (nur lesen). */
+    suspend fun labAnalysis(): LabAnalysis = get("health/labs/analysis/")
+
+    // ── Health: Training und Ernährungsampel (Phase 6) ──────────────────
+
+    /** Einheiten, neueste zuerst; [from]/[to] als `JJJJ-MM-TT`. Ist das Training im Profil aus, antwortet der Server mit 403 `training_disabled`. */
+    suspend fun trainings(from: String? = null, to: String? = null, limit: Int = 200, offset: Int = 0): Page<TrainingSession> =
+        get("health/trainings/", *buildList {
+            add("limit" to limit.toString()); add("offset" to offset.toString())
+            from?.let { add("from" to it) }; to?.let { add("to" to it) }
+        }.toTypedArray())
+
+    suspend fun addTraining(patch: TrainingPatch): TrainingSession = post("health/trainings/", patch.alsJson())
+
+    suspend fun updateTraining(id: Long, patch: TrainingPatch): TrainingSession = send("PATCH", "health/trainings/$id/", patch.alsJson())
+
+    suspend fun deleteTraining(id: Long) = ohneAntwort("DELETE", "health/trainings/$id/")
+
+    suspend fun trainingTemplates(): Page<TrainingTemplate> = get("health/training-templates/", "limit" to "200")
+
+    suspend fun createTrainingTemplate(patch: TrainingTemplatePatch): TrainingTemplate = post("health/training-templates/", patch.alsJson())
+
+    suspend fun updateTrainingTemplate(id: Long, patch: TrainingTemplatePatch): TrainingTemplate =
+        send("PATCH", "health/training-templates/$id/", patch.alsJson())
+
+    suspend fun deleteTrainingTemplate(id: Long) = ohneAntwort("DELETE", "health/training-templates/$id/")
+
+    suspend fun applyTrainingTemplate(id: Long, date: String): TrainingSession = post("health/training-templates/$id/apply/$date/", null)
+
+    suspend fun trainingGoals(): TrainingGoals = get("health/training-goals/")
+
+    suspend fun setTrainingGoals(patch: TrainingGoalsPatch): TrainingGoals = send("PUT", "health/training-goals/", patch.alsJson())
+
+    /** Wochenrückblick; [week] ist ein beliebiger Tag der Woche, [month] `JJJJ-MM`. */
+    suspend fun trainingReview(week: String? = null, month: String? = null): TrainingReview =
+        get("health/training/review/", *buildList {
+            week?.let { add("week" to it) }; month?.let { add("month" to it) }
+        }.toTypedArray())
+
+    /** Ernährungsampel einer Woche; [source] ist `tracker` oder `plan`. */
+    suspend fun trafficLight(week: String? = null, source: String = "tracker"): TrafficLight =
+        get("health/traffic-light/", *buildList {
+            add("source" to source); week?.let { add("week" to it) }
+        }.toTypedArray())
 
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {

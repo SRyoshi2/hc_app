@@ -1,7 +1,14 @@
 package de.sryoshi.hcapp.core
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -148,13 +155,27 @@ data class FoodSuggestion(
     val code: String = "",
     val name: String,
     @SerialName("kcal_100g") val kcal100g: Int,
-    @SerialName("protein_100g") val protein100g: Double? = null,
-    @SerialName("fat_100g") val fat100g: Double? = null,
-    @SerialName("carbs_100g") val carbs100g: Double? = null,
+    @Serializable(with = GrammSerializer::class) @SerialName("protein_100g") val protein100g: Double? = null,
+    @Serializable(with = GrammSerializer::class) @SerialName("fat_100g") val fat100g: Double? = null,
+    @Serializable(with = GrammSerializer::class) @SerialName("carbs_100g") val carbs100g: Double? = null,
 )
 
+/** Der Server liefert Gramm als Text (`"13.2"`), `null` bei fehlender Angabe; eine echte Zahl wird ebenfalls gelesen. */
+internal object GrammSerializer : KSerializer<Double?> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Gramm", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): Double? {
+        val element = (decoder as JsonDecoder).decodeJsonElement()
+        return (element as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.toDoubleOrNull()
+    }
+
+    override fun serialize(encoder: Encoder, value: Double?) {
+        if (value == null) encoder.encodeNull() else encoder.encodeString(value.toString())
+    }
+}
+
 @Serializable
-internal data class FoodSuggestions(val suggestions: List<FoodSuggestion> = emptyList())
+internal data class FoodSuggestions(val results: List<FoodSuggestion> = emptyList())
 
 /** Änderungen am Health-Profil; gesendet wird nur, was gesetzt wurde (`null` löscht, wo das erlaubt ist). */
 class HealthProfilePatch {
