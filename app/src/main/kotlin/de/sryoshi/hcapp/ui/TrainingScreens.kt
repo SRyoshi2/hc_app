@@ -27,6 +27,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -81,6 +82,7 @@ fun HealthTrainingScreen(vm: AppViewModel, s: Screen.HealthTraining) {
     var neu by remember { mutableStateOf(false) }
     var bearbeite by remember { mutableStateOf<TrainingSession?>(null) }
     var vorlageWaehlen by remember { mutableStateOf(false) }
+    var kiFragen by remember { mutableStateOf(false) }
 
     fun woche(tage: Long) = vm.show(Screen.HealthTraining(s.instance, s.me, LocalDate.parse(s.week).plusDays(tage).toString()))
 
@@ -188,6 +190,13 @@ fun HealthTrainingScreen(vm: AppViewModel, s: Screen.HealthTraining) {
                         }
                     }
                 }
+                w.aiText?.let {
+                    item {
+                        OutlinedButton(onClick = { kiFragen = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (w.review == null) "KI-Rückblick holen" else "KI-Rückblick erneuern")
+                        }
+                    }
+                }
                 w.review?.let { r ->
                     item {
                         HcKarte(Modifier.fillMaxWidth()) {
@@ -215,6 +224,9 @@ fun HealthTrainingScreen(vm: AppViewModel, s: Screen.HealthTraining) {
     if (neu) EinheitDialog(null, standard, onSave = { neu = false; vm.addTraining(s, it) }, onDelete = null, onCancel = { neu = false })
     bearbeite?.let { t ->
         EinheitDialog(t, standard, onSave = { bearbeite = null; vm.updateTraining(s, t.id, it) }, onDelete = { bearbeite = null; vm.deleteTraining(s, t.id) }, onCancel = { bearbeite = null })
+    }
+    if (kiFragen && w?.aiText != null) {
+        KiDialog("KI-Rückblick zur Woche", w.aiText, onJa = { kiFragen = false; vm.requestTrainingReview(s, w.weekStart) }, onNein = { kiFragen = false })
     }
     if (vorlageWaehlen) {
         VorlageUebernehmenDialog(vm.trainingVorlagen, standard, onOk = { id, datum -> vorlageWaehlen = false; vm.applyTrainingTemplate(s, id, datum) }, onCancel = { vorlageWaehlen = false })
@@ -500,6 +512,7 @@ private fun KriterienListe(k: List<TrafficCriterion>) {
 fun HealthTrafficScreen(vm: AppViewModel, s: Screen.HealthTraffic) {
     LaunchedEffect(s) { vm.loadTraffic(s) }
     val a = vm.ampel?.takeIf { it.source == s.source && s.week in it.weekStart..it.weekEnd }
+    var kiFragen by remember { mutableStateOf(false) }
     fun neu(tage: Long = 0, quelle: String = s.source) =
         vm.show(Screen.HealthTraffic(s.instance, s.me, LocalDate.parse(s.week).plusDays(tage).toString(), quelle))
 
@@ -559,6 +572,13 @@ fun HealthTrafficScreen(vm: AppViewModel, s: Screen.HealthTraffic) {
                 }
             }
         }
+        a.aiText?.let {
+            item {
+                OutlinedButton(onClick = { kiFragen = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (a.advice == null) "KI-Einschätzung holen" else "KI-Einschätzung erneuern")
+                }
+            }
+        }
         a.advice?.let { r ->
             item {
                 HcKarte(Modifier.fillMaxWidth()) {
@@ -573,5 +593,8 @@ fun HealthTrafficScreen(vm: AppViewModel, s: Screen.HealthTraffic) {
                 }
             }
         }
+    }
+    if (kiFragen && a?.aiText != null) {
+        KiDialog("KI-Einschätzung der Woche", a.aiText, onJa = { kiFragen = false; vm.requestTrafficAdvice(s) }, onNein = { kiFragen = false })
     }
 }

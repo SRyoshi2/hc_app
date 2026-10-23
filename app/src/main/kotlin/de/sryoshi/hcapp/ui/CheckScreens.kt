@@ -445,6 +445,7 @@ private fun LabDialog(vorhanden: LabMeasurement?, onSave: (LabPatch) -> Unit, on
 fun HealthLabsScreen(vm: AppViewModel, s: Screen.HealthLabs) {
     LaunchedEffect(s) { vm.loadLabs(s) }
     var neu by remember { mutableStateOf(false) }
+    var kiFragen by remember { mutableStateOf(false) }
     val u = vm.labUebersicht
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -479,6 +480,13 @@ fun HealthLabsScreen(vm: AppViewModel, s: Screen.HealthLabs) {
                     }
                 }
             }
+            vm.labAnalyse?.requestPreview?.takeIf { it.text.isNotBlank() && it.checksum.isNotBlank() }?.let {
+                item {
+                    OutlinedButton(onClick = { kiFragen = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (vm.labAnalyse?.analysis == null) "KI-Einordnung anfordern" else "KI-Einordnung erneuern")
+                    }
+                }
+            }
             vm.labAnalyse?.takeIf { it.aiAvailable }?.analysis?.let { a ->
                 item {
                     HcKarte(Modifier.fillMaxWidth()) {
@@ -487,7 +495,7 @@ fun HealthLabsScreen(vm: AppViewModel, s: Screen.HealthLabs) {
                             Text(a.text)
                             Text(
                                 (if (a.outdated) "Seit dieser Einordnung sind Messungen dazugekommen – sie ist nicht mehr aktuell. " else "") +
-                                    "Erzeugen oder erneuern kannst du sie im Web. Keine ärztliche Beratung.",
+                                    "Keine ärztliche Beratung.",
                                 style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
                             )
                         }
@@ -498,6 +506,14 @@ fun HealthLabsScreen(vm: AppViewModel, s: Screen.HealthLabs) {
         FloatingActionButton(onClick = { neu = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { Icon(Icons.Default.Add, "Neue Messung") }
     }
     if (neu) LabDialog(null, onSave = { neu = false; vm.addLab(s, it) }, onDelete = null, onCancel = { neu = false }, namen = u?.names.orEmpty())
+    val vorschau = vm.labAnalyse?.requestPreview
+    if (kiFragen && vorschau != null) {
+        KiDialog(
+            "KI-Einordnung der Laborwerte", vorschau.text,
+            "Eine Einordnung gegen die Referenzbereiche, keine Diagnose. Bei Fragen zu Werten sprich mit deiner Ärztin oder deinem Arzt.",
+            onJa = { kiFragen = false; vm.requestLabAnalysis(s, vorschau.checksum) }, onNein = { kiFragen = false },
+        )
+    }
 }
 
 @Composable

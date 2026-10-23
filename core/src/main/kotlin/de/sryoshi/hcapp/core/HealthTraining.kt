@@ -219,6 +219,8 @@ data class TrainingReview(
     val month: MonthSummary = MonthSummary(),
     @SerialName("long_term") val longTerm: GoalState? = null,
     val review: AiText? = null,
+    /** Der Text, der für den KI-Rückblick hinausginge; nur mit KI-Freigabe vorhanden. */
+    @SerialName("ai_text") val aiText: String? = null,
 )
 
 // ── Ernährungsampel ─────────────────────────────────────────────────────
@@ -264,4 +266,6 @@ data class TrafficLight(
     @SerialName("kcal_average") val kcalAverage: Int? = null,
     @SerialName("has_meal_plan") val hasMealPlan: Boolean = false,
     val advice: TrafficAdvice? = null,
+    /** Der Text, der für die KI-Einschätzung hinausginge; nur mit KI-Freigabe vorhanden. */
+    @SerialName("ai_text") val aiText: String? = null,
 )

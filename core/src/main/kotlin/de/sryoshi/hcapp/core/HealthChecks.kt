@@ -171,8 +171,16 @@ data class LabAnalysisText(
     val outdated: Boolean = false,
 )
 
+/** Was an die KI gehen würde, und die Prüfsumme genau dieses Texts (kommt bei der Anfrage mit zurück). */
 @Serializable
-data class LabAnalysis(@SerialName("ai_available") val aiAvailable: Boolean = false, val analysis: LabAnalysisText? = null)
+data class LabRequestPreview(val text: String = "", val checksum: String = "")
+
+@Serializable
+data class LabAnalysis(
+    @SerialName("ai_available") val aiAvailable: Boolean = false,
+    val analysis: LabAnalysisText? = null,
+    @SerialName("request_preview") val requestPreview: LabRequestPreview? = null,
+)
 
 class LabPatch : FeldPatch() {
     fun name(v: String) = apply { text("name", v) }

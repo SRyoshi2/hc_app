@@ -69,6 +69,7 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
     val t = vm.kalorienTag?.takeIf { it.date == s.date }
     var neu by remember { mutableStateOf(false) }
     var bearbeite by remember { mutableStateOf<CalorieEntry?>(null) }
+    var kiFragen by remember { mutableStateOf(false) }
     val tag = runCatching { LocalDate.parse(s.date) }.getOrNull() ?: LocalDate.now()
 
     Box(Modifier.fillMaxSize()) {
@@ -102,7 +103,21 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
                     }
                 }
                 if (t.entries.isEmpty()) item { Text("Noch nichts erfasst. Mit „+“ trägst du eine Mahlzeit ein.", color = Hc.farben.muted) }
-                items(t.entries, key = { it.id }) { e -> EintragZeile(e) { bearbeite = e } }
+                items(t.entries, key = { it.id }) { e ->
+                    Column {
+                        EintragZeile(e) { bearbeite = e }
+                        if (e.nutrientsEstimated) {
+                            TextButton(onClick = { vm.discardEstimate(s, e.id) }, enabled = !vm.busy) { Text("KI-Schätzung der Nährwerte zurücknehmen") }
+                        }
+                    }
+                }
+                if (t.openEstimates > 0) {
+                    item {
+                        OutlinedButton(onClick = { kiFragen = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                            Text("Nährwerte schätzen lassen (${t.openEstimates})")
+                        }
+                    }
+                }
             }
             item {
                 TextButton(onClick = { vm.show(Screen.HealthMonth(s.instance, s.me, s.date.take(7))) }) { Text("Monatsübersicht") }
@@ -111,6 +126,15 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
         FloatingActionButton(onClick = { neu = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { Icon(Icons.Default.Add, "Mahlzeit erfassen") }
     }
 
+    if (kiFragen && t != null) {
+        KiDialog(
+            "Nährwerte schätzen",
+            t.entries.filter { it.needsEstimate }.joinToString("\n") { "• ${it.title}" },
+            "Geschätzt werden Eiweiß, Fett und Kohlenhydrate je Portion; die kcal bleiben unverändert. Was die KI nicht zuordnen kann, bleibt leer. " +
+                "Du kannst jede Schätzung wieder zurücknehmen.",
+            onJa = { kiFragen = false; vm.estimateDay(s) }, onNein = { kiFragen = false },
+        )
+    }
     if (neu) {
         MahlzeitDialog(
             vm = vm, s = s, vorhanden = null,

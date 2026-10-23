@@ -89,6 +89,8 @@ data class CalorieEntry(
     @SerialName("carbs_g") val carbsG: String? = null,
     @SerialName("nutrients_estimated") val nutrientsEstimated: Boolean = false,
     @SerialName("has_nutrients") val hasNutrients: Boolean = false,
+    /** Eine KI-Schätzung würde etwas beitragen: kein Rezept dahinter und noch keine Nährwerte. */
+    @SerialName("needs_estimate") val needsEstimate: Boolean = false,
 )
 
 /** `GET /health/calories/<JJJJ-MM-TT>/`. Lesen übernimmt beim ersten Mal die Mahlzeiten des Speiseplans als Einträge. */
@@ -108,6 +110,8 @@ data class CalorieDay(
     val status: String? = null,
     @SerialName("has_meal_plan") val hasMealPlan: Boolean = false,
     @SerialName("seeded_count") val seededCount: Int = 0,
+    /** Mahlzeiten dieses Tages, für die eine Schätzung der Nährwerte möglich ist. */
+    @SerialName("open_estimates") val openEstimates: Int = 0,
 )
 
 @Serializable

@@ -87,6 +87,23 @@ fun RecipeEditScreen(vm: AppViewModel, s: Screen.RecipeEdit) {
         }
     }
     var neueKategorie by remember { mutableStateOf(false) }
+    var vorschlag by remember { mutableStateOf(false) }
+    var schaetzFragen by remember { mutableStateOf(false) }
+    if (vorschlag) {
+        RezeptVorschlagDialog(
+            onOk = { zutaten, portionen, wunsch -> vorschlag = false; vm.generateRecipe(s, zutaten, portionen, wunsch) },
+            onCancel = { vorschlag = false },
+        )
+    }
+    if (schaetzFragen) {
+        KiDialog(
+            "Nährwerte schätzen",
+            "${e.titel.ifBlank { "Unbenanntes Rezept" }} (${e.portionen} Portionen)\n" +
+                vm.schaetzZutaten().joinToString("\n") { "• ${it.amount.orEmpty()} ${it.unit} ${it.name}".replace("  ", " ").trim() },
+            "Die Werte je Portion landen in den Feldern unten; du prüfst und speicherst sie selbst.",
+            onJa = { schaetzFragen = false; vm.estimateRecipeNutrition(s) }, onNein = { schaetzFragen = false },
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -94,6 +111,11 @@ fun RecipeEditScreen(vm: AppViewModel, s: Screen.RecipeEdit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                OutlinedButton(onClick = { vorschlag = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("Rezept aus Zutaten vorschlagen lassen (KI)")
+                }
+            }
             // Titelbild
             item {
                 val zeigen: Any? = e.titelbild ?: if (e.titelbildEntfernen) null else e.original?.imageUrl
@@ -208,6 +230,10 @@ fun RecipeEditScreen(vm: AppViewModel, s: Screen.RecipeEdit) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Nährwerte pro Portion (optional)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    OutlinedButton(
+                        onClick = { schaetzFragen = true }, enabled = !vm.busy && e.zutaten.any { it.name.isNotBlank() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Von der KI schätzen lassen") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Zahlenfeld(e.kcal, { e.kcal = it }, "Kalorien", Modifier.weight(1f))
                         Zahlenfeld(e.eiweiss, { e.eiweiss = it }, "Eiweiß (g)", Modifier.weight(1f))

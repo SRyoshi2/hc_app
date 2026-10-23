@@ -438,3 +438,21 @@ Server: `mobile_api/freigaben.py`, `benachrichtigungen.py`.
 - **Meldungen** `notifications/` (+ `unread-count/`, `<id>/read/`, `read-all/`, `DELETE <id>/`): Abruf statt Push (FCM bräuchte
   einen zeitgesteuerten Dienst). Der erste Abruf am Tag lässt den Server fällige OweMe-Erinnerungen erzeugen. Die App holt den
   Zähler beim Öffnen der Startseite; ein Tipp markiert als gelesen und öffnet Liste, Konto oder Rezept (`target`).
+
+## 14. Phase 7c und 8 (umgesetzt)
+
+**KI-Funktionen** (`mobile_api/ki.py`): Voraussetzung ist `abo_ai` (sonst 403 `ai_required`); jede Anfrage braucht
+`{"confirmed": true}`, die App zeigt vorher den Text, der hinausgeht (`ai_text`, bei Laborwerten `request_preview`), und fragt
+nach. Anbieterfehler kommen als 502 `ai_failed` mit Grund.
+
+| Funktion | Endpunkt | In der App |
+|---|---|---|
+| Laborwerte einordnen | `POST health/labs/analysis/` mit `checksum` aus `request_preview` (409 `checksum_mismatch`, wenn sich Werte geändert haben) | Knopf auf der Laborseite, Dialog mit Text |
+| Wochenrückblick Training | `POST health/training/review/` (`week`) | Knopf in der Wochenansicht |
+| Ernährungseinschätzung | `POST health/traffic-light/` (`week`, `source`) | Knopf bei der Ampel |
+| Nährwerte schätzen | `POST health/calorie-entries/<id>/estimate-nutrients/`, `…/calories/<tag>/estimate-nutrients/`, `DELETE` nimmt zurück | Knopf am Tag (offene Mahlzeiten: `open_estimates`), Zurücknehmen je Eintrag |
+| Rezept vorschlagen | `POST recipes/ai/generate/` (speichert nichts) | Editor: füllt den Entwurf, gespeichert wird erst per „Speichern“ |
+| Rezeptnährwerte schätzen | `POST recipes/ai/estimate-nutrition/` | Editor: füllt die Nährwertfelder |
+
+**Phase 8:** Referenz aus dem Code (`manage.py api_referenz`), Sicherheitsdurchsicht; `DELETE …/read/` löschte eine Meldung (behoben).
+

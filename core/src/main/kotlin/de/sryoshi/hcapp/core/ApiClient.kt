@@ -433,6 +433,60 @@ class ApiClient(
         }
     }
 
+    // ── KI-Funktionen (Phase 7c) ────────────────────────────────────────
+
+    private fun bestaetigt(vararg weitere: Pair<String, JsonElement>) =
+        JsonObject(mapOf<String, JsonElement>("confirmed" to JsonPrimitive(true)) + weitere)
+
+    /** Fordert die KI-Einordnung der Laborwerte an; [checksum] stammt aus [LabAnalysis.requestPreview] (sonst 409 `checksum_mismatch`). */
+    suspend fun requestLabAnalysis(checksum: String): LabAnalysis =
+        post("health/labs/analysis/", bestaetigt("checksum" to JsonPrimitive(checksum)))
+
+    suspend fun requestTrainingReview(week: String): AiText =
+        post<TrainingReviewResponse>("health/training/review/", bestaetigt("week" to JsonPrimitive(week))).review
+
+    suspend fun requestTrafficAdvice(week: String, source: String): TrafficAdvice =
+        post<TrafficAdviceResponse>(
+            "health/traffic-light/", bestaetigt("week" to JsonPrimitive(week), "source" to JsonPrimitive(source)),
+        ).advice
+
+    /** Schätzt die Nährwerte einer Mahlzeit; liefert sie mit den neuen Werten zurück. */
+    suspend fun estimateEntryNutrients(id: Long): NutrientEstimate = post("health/calorie-entries/$id/estimate-nutrients/", bestaetigt())
+
+    /** Schätzt alles an diesem Tag (`JJJJ-MM-TT`), was noch keine Nährwerte hat. */
+    suspend fun estimateDayNutrients(date: String): NutrientEstimate = post("health/calories/$date/estimate-nutrients/", bestaetigt())
+
+    /** Nimmt eine Schätzung wieder zurück. */
+    suspend fun discardEntryEstimate(id: Long): CalorieEntry = send("DELETE", "health/calorie-entries/$id/estimate-nutrients/", null)
+
+    /** Rezeptvorschlag aus Zutaten; speichert nichts. [servings] 1 bis 99, [note] höchstens 300 Zeichen. */
+    suspend fun generateRecipe(ingredientsText: String, servings: Int = 2, note: String = ""): GeneratedRecipe =
+        post<GeneratedRecipeResponse>(
+            "recipes/ai/generate/",
+            bestaetigt(
+                "ingredients_text" to JsonPrimitive(ingredientsText),
+                "servings" to JsonPrimitive(servings),
+                "note" to JsonPrimitive(note),
+            ),
+        ).recipe
+
+    /** Nährwerte je Portion aus Titel und Zutaten (noch nicht gespeichert). */
+    suspend fun estimateRecipeNutrition(title: String, ingredients: List<IngredientInput>, servings: Int): NutritionEstimate =
+        post<NutritionEstimateResponse>(
+            "recipes/ai/estimate-nutrition/",
+            bestaetigt(
+                "title" to JsonPrimitive(title),
+                "servings" to JsonPrimitive(servings),
+                "ingredients" to JsonArray(ingredients.map {
+                    JsonObject(mapOf(
+                        "name" to JsonPrimitive(it.name),
+                        "amount" to (it.amount?.let(::JsonPrimitive) ?: JsonNull),
+                        "unit" to JsonPrimitive(it.unit),
+                    ))
+                }),
+            ),
+        ).nutrition
+
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {
             add("limit" to limit.toString())

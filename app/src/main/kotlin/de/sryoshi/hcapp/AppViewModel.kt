@@ -37,7 +37,12 @@ import de.sryoshi.hcapp.core.TrainingTemplate
 import de.sryoshi.hcapp.core.TrainingTemplatePatch
 import de.sryoshi.hcapp.core.Vaccination
 import de.sryoshi.hcapp.core.VaccinationPatch
+import de.sryoshi.hcapp.core.IngredientInput
+import de.sryoshi.hcapp.core.RecipeUnits
 import de.sryoshi.hcapp.data.DateiHelfer
+import de.sryoshi.hcapp.ui.SchrittEntwurf
+import de.sryoshi.hcapp.ui.ZutatEntwurf
+import de.sryoshi.hcapp.ui.zahlKurz
 import de.sryoshi.hcapp.core.MealTemplatePatch
 import de.sryoshi.hcapp.core.MealTemplate
 import de.sryoshi.hcapp.core.HealthProfilePatch
@@ -991,6 +996,92 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         client(s.instance).deleteNotification(m.id)
         meldungen = meldungen.filter { it.id != m.id }
         if (!m.read) ungelesen = (ungelesen - 1).coerceAtLeast(0)
+    }
+
+    // ── KI-Funktionen (Phase 7c) ────────────────────────────────────────
+    // Jeder Aufruf kostet beim Anbieter: Die Bildschirme zeigen vorher den Text, der hinausgeht, und fragen nach.
+
+    fun requestLabAnalysis(s: Screen.HealthLabs, checksum: String) = run(s.instance) {
+        val api = client(s.instance)
+        labAnalyse = api.requestLabAnalysis(checksum)
+        labUebersicht = api.labs()
+        info = "KI-Einordnung abgelegt."
+    }
+
+    fun requestTrainingReview(s: Screen.HealthTraining, woche: String) = run(s.instance) {
+        val api = client(s.instance)
+        api.requestTrainingReview(woche)
+        trainingNeu(s)
+    }
+
+    fun requestTrafficAdvice(s: Screen.HealthTraffic) = run(s.instance) {
+        val api = client(s.instance)
+        api.requestTrafficAdvice(s.week, s.source)
+        ampel = api.trafficLight(s.week, s.source)
+    }
+
+    private fun schaetzInfo(gefuellt: Int, uebersprungen: Int) {
+        info = when {
+            gefuellt == 0 -> "Die KI konnte das nicht zuordnen – die Nährwerte bleiben leer."
+            uebersprungen > 0 -> "$gefuellt geschätzt, $uebersprungen nicht zuzuordnen."
+            else -> "Nährwerte geschätzt."
+        }
+    }
+
+    fun estimateEntry(s: Screen.HealthDay, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        val r = api.estimateEntryNutrients(id)
+        kalorienTag = api.calorieDay(s.date)
+        schaetzInfo(r.filled, r.skipped)
+    }
+
+    fun estimateDay(s: Screen.HealthDay) = run(s.instance) {
+        val api = client(s.instance)
+        val r = api.estimateDayNutrients(s.date)
+        kalorienTag = api.calorieDay(s.date)
+        schaetzInfo(r.filled, r.skipped)
+    }
+
+    fun discardEstimate(s: Screen.HealthDay, id: Long) = run(s.instance) {
+        val api = client(s.instance)
+        api.discardEntryEstimate(id)
+        kalorienTag = api.calorieDay(s.date)
+    }
+
+    /** Füllt den Rezept-Entwurf mit einem KI-Vorschlag (ersetzt Titel, Beschreibung, Zutaten und Schritte). Gespeichert wird erst per „Speichern“. */
+    fun generateRecipe(s: Screen.RecipeEdit, zutaten: String, portionen: Int, wunsch: String) = run(s.instance) {
+        val r = client(s.instance).generateRecipe(zutaten.trim(), portionen, wunsch.trim())
+        val e = entwurf ?: return@run
+        if (r.title.isNotBlank()) e.titel = r.title
+        e.beschreibung = r.description
+        r.servings?.let { zahlKurz(it).takeIf { p -> p.isNotBlank() } }?.let { e.portionen = it }
+        val einheiten = RecipeUnits.alle.map { it.first }.toSet()
+        e.zutaten.clear()
+        r.ingredients.filter { it.name.isNotBlank() }.forEach {
+            e.zutaten.add(ZutatEntwurf(null, it.name.trim(), zahlKurz(it.amount), it.unit.trim().lowercase().takeIf { u -> u in einheiten }.orEmpty()))
+        }
+        if (e.zutaten.isEmpty()) e.zutaten.add(ZutatEntwurf(null))
+        e.schritte.clear()
+        r.steps.filter { it.text.isNotBlank() }.forEach { e.schritte.add(SchrittEntwurf(it.heading.trim(), it.text.trim())) }
+        if (e.schritte.isEmpty()) e.schritte.add(SchrittEntwurf())
+        info = "Vorschlag übernommen – bitte prüfen und anpassen."
+    }
+
+    /** Die Zutaten, die eine Nährwertschätzung des Entwurfs an die KI schickt. */
+    fun schaetzZutaten(): List<IngredientInput> =
+        entwurf?.zutaten.orEmpty().filter { it.name.isNotBlank() }.map {
+            IngredientInput(name = it.name.trim(), amount = it.menge.trim().replace(',', '.').ifBlank { null }, unit = it.einheit)
+        }
+
+    fun estimateRecipeNutrition(s: Screen.RecipeEdit) = run(s.instance) {
+        val e = entwurf ?: return@run
+        val portionen = (e.portionen.trim().toIntOrNull() ?: 1).coerceIn(1, 99)
+        val n = client(s.instance).estimateRecipeNutrition(e.titel.trim(), schaetzZutaten(), portionen)
+        n.kcal?.let { e.kcal = zahlKurz(it) }
+        n.proteinG?.let { e.eiweiss = zahlKurz(it) }
+        n.fatG?.let { e.fett = zahlKurz(it) }
+        n.carbsG?.let { e.kohlenhydrate = zahlKurz(it) }
+        info = "Nährwerte geschätzt – bitte prüfen."
     }
 
     fun clearFoods() {
