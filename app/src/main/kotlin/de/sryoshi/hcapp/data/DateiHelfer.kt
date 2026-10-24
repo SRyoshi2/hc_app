@@ -34,4 +34,9 @@ object DateiHelfer {
         val strom = context.contentResolver.openOutputStream(uri) ?: throw IOException("Die Datei lässt sich nicht speichern.")
         strom.use { it.write(bytes) }
     }
+
+    /** Öffnet die vom Nutzer gewählte Datei zum Schreiben (für große Downloads, die nicht im Speicher liegen sollen). */
+    suspend fun oeffnenZumSchreiben(context: Context, uri: Uri): java.io.OutputStream = withContext(Dispatchers.IO) {
+        context.contentResolver.openOutputStream(uri) ?: throw IOException("Die Datei lässt sich nicht speichern.")
+    }
 }

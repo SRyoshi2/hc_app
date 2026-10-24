@@ -11,5 +11,6 @@ fun Screen.welt(): Welt = when (this) {
     is Screen.Health, is Screen.HealthDay, is Screen.HealthMonth, is Screen.HealthWeight, is Screen.HealthTemplates,
     is Screen.HealthChecks, is Screen.HealthCheckDetail, is Screen.HealthVaccinations, is Screen.HealthLabs, is Screen.HealthLabTrend,
     is Screen.HealthTraining, is Screen.HealthTrainingTemplates, is Screen.HealthTrainingGoals, is Screen.HealthTraffic -> Welt.HEALTH
+    is Screen.Downloads, is Screen.DownloadDetail -> Welt.DOWNLOADS
     else -> Welt.HOMECENTER
 }

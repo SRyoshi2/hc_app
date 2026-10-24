@@ -456,3 +456,16 @@ nach. Anbieterfehler kommen als 502 `ai_failed` mit Grund.
 
 **Phase 8:** Referenz aus dem Code (`manage.py api_referenz`), Sicherheitsdurchsicht; `DELETE …/read/` löschte eine Meldung (behoben).
 
+## 15. Download Center (API 0.93.1083, umgesetzt)
+
+Nur lesen und laden; gepflegt wird im Web. App-Schlüssel `downloads` (in `GET /me/` unter `apps`), gekoppelt an `abo_1`.
+
+- `GET downloads/?type=&category=&q=&limit=&offset=`: sichtbare Downloads nach Typ, Kategorie und Titel; dazu `types` und
+  `categories` zur Auswahl (mit Anzahl, nur solche mit sichtbaren Downloads).
+- `GET downloads/<key>/`: Detail mit `description` (HTML aus dem Editor, die App zeigt es wie die Rezepttexte), `description_text`,
+  Größe und `sha256`.
+- `GET downloads/<key>/file/`: Datei als Anhang, jeder Abruf wird gezählt, **ohne Range**: ein abgebrochener Ladevorgang
+  beginnt von vorn. Dateien sind bis 2 GB möglich, deshalb schreibt die App streamend in eine vom Nutzer gewählte Datei
+  (Storage Access Framework) und prüft danach den SHA-256 gegen den Wert des Details.
+- Wer einen Download nicht sehen darf (Gruppenregel), bekommt 404, auch für die Datei.
+

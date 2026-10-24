@@ -17,6 +17,8 @@ import de.sryoshi.hcapp.core.InstanceUrl
 import de.sryoshi.hcapp.core.InvalidInstanceUrl
 import de.sryoshi.hcapp.core.ItemInput
 import de.sryoshi.hcapp.core.WeightEntry
+import de.sryoshi.hcapp.core.DownloadItem
+import de.sryoshi.hcapp.core.DownloadPage
 import de.sryoshi.hcapp.core.AppNotification
 import de.sryoshi.hcapp.core.RecipeOffer
 import de.sryoshi.hcapp.core.ShareUser
@@ -108,6 +110,8 @@ sealed interface Screen {
     data class HealthTrainingGoals(val instance: Instance, val me: Me) : Screen
     data class RecipeOffers(val instance: Instance, val me: Me) : Screen
     data class Notifications(val instance: Instance, val me: Me) : Screen
+    data class Downloads(val instance: Instance, val me: Me) : Screen
+    data class DownloadDetail(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
     /** [source] ist `tracker` oder `plan`. */
     data class HealthTraffic(val instance: Instance, val me: Me, val week: String, val source: String) : Screen
 }
@@ -211,6 +215,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var ungelesen by mutableStateOf(0)
         private set
 
+    var downloadSeite by mutableStateOf<DownloadPage?>(null)
+        private set
+    var downloadDetail by mutableStateOf<DownloadItem?>(null)
+        private set
+    /** Suchtext und Auswahl der Liste bleiben beim Wechsel zum Detail erhalten. */
+    var downloadQuery by mutableStateOf("")
+        private set
+    var downloadTyp by mutableStateOf<Long?>(null)
+        private set
+    var downloadKategorie by mutableStateOf<Long?>(null)
+        private set
+    /** Bereits empfangene Bytes während eines Ladevorgangs; `null`, wenn keiner läuft. */
+    var downloadFortschritt by mutableStateOf<Long?>(null)
+        private set
+
     var oweMe by mutableStateOf<OweMeOverview?>(null)
         private set
     var konto by mutableStateOf<OweMeAccountDetail?>(null)
@@ -246,6 +265,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is Screen.HealthTrainingGoals -> Screen.HealthTraining(s.instance, s.me, heute())
                 is Screen.RecipeOffers -> Screen.Recipes(s.instance, s.me)
                 is Screen.Notifications -> Screen.Home(s.instance, s.me)
+                is Screen.Downloads -> Screen.Home(s.instance, s.me)
+                is Screen.DownloadDetail -> Screen.Downloads(s.instance, s.me)
                 is Screen.OweMeUebersicht -> Screen.Home(s.instance, s.me)
                 is Screen.OweMeKonto -> Screen.OweMeUebersicht(s.instance, s.me)
                 is Screen.OweMeRatenplan -> Screen.OweMeKonto(s.instance, s.me, s.key, s.title)
@@ -1092,6 +1113,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         n.fatG?.let { e.fett = zahlKurz(it) }
         n.carbsG?.let { e.kohlenhydrate = zahlKurz(it) }
         info = "Nährwerte geschätzt – bitte prüfen."
+    }
+
+    // ── Download Center ─────────────────────────────────────────────────
+
+    fun loadDownloads(s: Screen.Downloads) = run(s.instance) {
+        downloadSeite = client(s.instance).downloads(downloadQuery, downloadTyp, downloadKategorie)
+    }
+
+    /** Neue Suche oder Auswahl (Typ/Kategorie; `null` = alle) und Liste neu laden. */
+    fun filterDownloads(s: Screen.Downloads, q: String = downloadQuery, typ: Long? = downloadTyp, kategorie: Long? = downloadKategorie) {
+        downloadQuery = q.trim()
+        downloadTyp = typ
+        downloadKategorie = kategorie
+        loadDownloads(s)
+    }
+
+    fun loadDownload(s: Screen.DownloadDetail) {
+        if (downloadDetail?.key != s.key) downloadDetail = null
+        run(s.instance) { downloadDetail = client(s.instance).download(s.key) }
+    }
+
+    /**
+     * Lädt die Datei streamend in die gewählte Zieldatei und prüft den SHA-256 gegen den Wert des Servers. Stimmt er nicht,
+     * sagt die App das deutlich: die Datei ist dann beschädigt oder unterwegs verändert worden.
+     */
+    fun saveDownload(s: Screen.DownloadDetail, d: DownloadItem, ziel: android.net.Uri) = run(s.instance) {
+        downloadFortschritt = 0
+        try {
+            val ergebnis = DateiHelfer.oeffnenZumSchreiben(getApplication<Application>(), ziel).use { aus ->
+                client(s.instance).downloadFile(d.key, aus) { downloadFortschritt = it }
+            }
+            downloadDetail = client(s.instance).download(d.key)
+            if (d.sha256.isNotBlank() && !ergebnis.sha256.equals(d.sha256, ignoreCase = true)) {
+                error = "Die Prüfsumme der geladenen Datei stimmt nicht mit der des Servers überein. Bitte die Datei nicht verwenden und erneut laden."
+            } else {
+                info = "Gespeichert: ${d.filename.ifBlank { d.title }}" + if (d.sha256.isNotBlank()) " (Prüfsumme stimmt)" else ""
+            }
+        } finally {
+            downloadFortschritt = null
+        }
     }
 
     fun clearFoods() {

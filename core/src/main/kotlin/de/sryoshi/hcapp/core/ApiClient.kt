@@ -1,6 +1,7 @@
 package de.sryoshi.hcapp.core
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -486,6 +487,51 @@ class ApiClient(
                 }),
             ),
         ).nutrition
+
+    // ── Download Center ─────────────────────────────────────────────────
+
+    /** Die sichtbaren Downloads nach Typ, Kategorie und Titel; [type] und [category] sind Nummern aus [DownloadPage.types]/[DownloadPage.categories]. */
+    suspend fun downloads(q: String = "", type: Long? = null, category: Long? = null, limit: Int = 100, offset: Int = 0): DownloadPage =
+        get("downloads/", *buildList {
+            add("limit" to limit.toString()); add("offset" to offset.toString())
+            if (q.isNotBlank()) add("q" to q.trim())
+            type?.let { add("type" to it.toString()) }
+            category?.let { add("category" to it.toString()) }
+        }.toTypedArray())
+
+    suspend fun download(key: String): DownloadItem = get("downloads/$key/")
+
+    /**
+     * Lädt die Datei streamend in [ziel] (ohne sie im Speicher zu halten; Dateien können Gigabyte groß sein), meldet den
+     * Fortschritt in Bytes und liefert Größe und SHA-256 des Empfangenen. Der Aufrufer vergleicht mit [DownloadItem.sha256].
+     * Der Abruf wird auf dem Server gezählt; er lässt sich nicht fortsetzen (kein Range). Schließt [ziel] nicht.
+     */
+    suspend fun downloadFile(key: String, ziel: java.io.OutputStream, onProgress: (Long) -> Unit = {}): DownloadResult =
+        withContext(Dispatchers.IO) {
+            val request = anfrage("GET", "downloads/$key/file/", null).newBuilder().removeHeader("Accept").build()
+            try {
+                http.newCall(request).execute().use { r ->
+                    if (!r.isSuccessful) throw fehler(r.code, r.body?.string().orEmpty())
+                    val quelle = r.body?.byteStream() ?: throw ApiException(ApiException.BAD_RESPONSE, "Die Antwort enthält keine Datei.", r.code)
+                    val digest = java.security.MessageDigest.getInstance("SHA-256")
+                    val puffer = ByteArray(64 * 1024)
+                    var gesamt = 0L
+                    while (true) {
+                        val n = quelle.read(puffer)
+                        if (n < 0) break
+                        ensureActive()
+                        digest.update(puffer, 0, n)
+                        ziel.write(puffer, 0, n)
+                        gesamt += n
+                        onProgress(gesamt)
+                    }
+                    ziel.flush()
+                    DownloadResult(gesamt, digest.digest().joinToString("") { "%02x".format(it) })
+                }
+            } catch (e: IOException) {
+                throw ApiException(ApiException.NETWORK, "Die Übertragung wurde unterbrochen.", cause = e)
+            }
+        }
 
     private fun rezeptAbfrage(q: String, categories: List<String>, limit: Int, offset: Int): Array<Pair<String, String>> =
         buildList {

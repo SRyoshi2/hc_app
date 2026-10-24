@@ -34,6 +34,7 @@ object AppKey {
     const val SHOPPING = "einkaufsliste"
     const val RECIPES = "rezepte"
     const val OWEME = "oweme"
+    const val DOWNLOADS = "downloads"
 }
 
 /** `GET /api/v1/me/` */

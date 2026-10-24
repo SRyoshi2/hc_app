@@ -51,7 +51,7 @@ val DunkelFarben = HcFarben(
 )
 
 /** Jede App hat ihr eigenes Farbset; die Bildschirme der Instanzverwaltung gehören zu HomeCenter. */
-enum class Welt { HOMECENTER, EINKAUF, REZEPTE, OWEME, HEALTH }
+enum class Welt { HOMECENTER, EINKAUF, REZEPTE, OWEME, HEALTH, DOWNLOADS }
 
 /**
  * Farbset einer App. Die Grundfarben stammen aus den App-Icons (`app_*.png`):
@@ -94,6 +94,12 @@ fun HcFarben.set(welt: Welt): AppFarben {
             kopf = c(0x0f766e), onKopf = weiss,
             akzent = if (dunkel) c(0x14b8a6) else c(0x0f766e), onAkzent = if (dunkel) TEXT_AUF_HELL else weiss,
             sekundaer = if (dunkel) c(0x14b8a6) else c(0x0f766e),
+        )
+        // Download Center: Kupferorange #d2601a (weiße Schrift 3,9:1 im Kopf; Akzent hell abgedunkelt für 4,5:1)
+        Welt.DOWNLOADS -> AppFarben(
+            kopf = c(0xd2601a), onKopf = weiss,
+            akzent = if (dunkel) c(0xe8793a) else c(0xb4501a), onAkzent = if (dunkel) TEXT_AUF_HELL else weiss,
+            sekundaer = if (dunkel) c(0xe8793a) else c(0xb4501a),
         )
     }
 }

@@ -22,6 +22,7 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | Health: Arztbesuche mit Dokumenten (Hochladen/Herunterladen) und Kommentaren, Impfbuch, Laborwerte mit Verlauf, Training (Einheiten, Vorlagen, Wochen-/Langzeitziele, Rückblick), Ernährungsampel; Lebensmittelvorschläge (BLS) im Kalorientracker | umgesetzt (API Phase 6) |
 | KI-Funktionen (nur mit KI-Freigabe, jede Anfrage nach Bestätigung des gesendeten Texts): Rezept aus Zutaten vorschlagen, Nährwerte schätzen (Rezept und Kalorientracker), Laborwert-Einordnung, Trainingsrückblick, Ernährungseinschätzung | umgesetzt (API Phase 7c) |
 | Mahlzeit im Kalorientracker auf einen wählbaren Tag kopieren (vorgewählt: heute) | umgesetzt |
+| Download Center: Übersicht mit Suche und Auswahl nach Typ und Kategorie, Detail mit Beschreibung, Größe und SHA-256, Datei laden (streamend an einen gewählten Speicherort, Prüfsumme wird verglichen) | umgesetzt (API 0.93.1083) |
 | Teilen von Einkaufslisten und OweMe-Konten (Benutzer wählen), Rezepte anbieten, Angebote übernehmen/ablehnen, OweMe-CSV-Export, Meldungen (Glocke auf der Startseite, Abruf beim Öffnen) | umgesetzt (API Phase 7) |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die
@@ -94,5 +95,5 @@ Release derselbe sein.
 
 ## Voraussetzung auf der Instanz
 
-Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 7).
+Die Instanz braucht `mobile_api` (HomeCenter, Branch `feature/mobile-api`, Phase 0 bis 8 und Download Center (0.93.1083)).
 Ältere Instanzen melden „unterstützt die App noch nicht“.

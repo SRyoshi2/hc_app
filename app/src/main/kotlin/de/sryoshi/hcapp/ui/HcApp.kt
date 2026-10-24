@@ -123,6 +123,8 @@ fun HcApp(vm: AppViewModel) {
         is Screen.HealthTraffic -> "Ernährungsampel"
         is Screen.RecipeOffers -> "Rezept-Angebote"
         is Screen.Notifications -> "Meldungen"
+        is Screen.Downloads -> "Download Center"
+        is Screen.DownloadDetail -> s.title
     }
     val welt = s.welt()
     val (kopfFarbe, kopfText) = Hc.farben.kopf(welt)
@@ -192,6 +194,8 @@ fun HcApp(vm: AppViewModel) {
                 is Screen.HealthTraffic -> HealthTrafficScreen(vm, s)
                 is Screen.RecipeOffers -> RecipeOffersScreen(vm, s)
                 is Screen.Notifications -> NotificationsScreen(vm, s)
+                is Screen.Downloads -> DownloadsScreen(vm, s)
+                is Screen.DownloadDetail -> DownloadDetailScreen(vm, s)
             }
             if (vm.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(8.dp))
         }
@@ -318,6 +322,7 @@ private val APPS = listOf(
     AppEintrag(AppKey.RECIPES, "Rezeptverwaltung", "Rezeptverwaltung", R.drawable.app_rezepte, true) { Screen.Recipes(it.instance, it.me) },
     AppEintrag(AppKey.OWEME, "OweMe", "OweMe", R.drawable.app_oweme, true) { Screen.OweMeUebersicht(it.instance, it.me) },
     AppEintrag(AppKey.HEALTH, "Health", "Health", R.drawable.app_health, true) { Screen.Health(it.instance, it.me) },
+    AppEintrag(AppKey.DOWNLOADS, "Download Center", "Download Center", R.drawable.app_downloads, true) { Screen.Downloads(it.instance, it.me) },
 )
 
 /**
