@@ -21,6 +21,7 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 | Lebensmittel-Vorschläge beim Tippen (Bundeslebensmittelschlüssel) | App fertig, wartet auf den Endpunkt `GET /health/foods/` (siehe Konzept, Abschnitt 11) |
 | Health: Arztbesuche mit Dokumenten (Hochladen/Herunterladen) und Kommentaren, Impfbuch, Laborwerte mit Verlauf, Training (Einheiten, Vorlagen, Wochen-/Langzeitziele, Rückblick), Ernährungsampel; Lebensmittelvorschläge (BLS) im Kalorientracker | umgesetzt (API Phase 6) |
 | KI-Funktionen (nur mit KI-Freigabe, jede Anfrage nach Bestätigung des gesendeten Texts): Rezept aus Zutaten vorschlagen, Nährwerte schätzen (Rezept und Kalorientracker), Laborwert-Einordnung, Trainingsrückblick, Ernährungseinschätzung | umgesetzt (API Phase 7c) |
+| Mahlzeit im Kalorientracker auf einen wählbaren Tag kopieren (vorgewählt: heute) | umgesetzt |
 | Teilen von Einkaufslisten und OweMe-Konten (Benutzer wählen), Rezepte anbieten, Angebote übernehmen/ablehnen, OweMe-CSV-Export, Meldungen (Glocke auf der Startseite, Abruf beim Öffnen) | umgesetzt (API Phase 7) |
 
 **Nicht geprüft:** Weder `core` noch `app` wurden bisher kompiliert oder getestet. Die

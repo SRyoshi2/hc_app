@@ -608,6 +608,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         kalorienTag = api.calorieDay(s.date)
     }
 
+    /** Dupliziert die Mahlzeit auf [datum] (`JJJJ-MM-TT`): Titel, kcal, Portionen und Nährwerte, soweit vorhanden. */
+    fun copyCalorieEntry(s: Screen.HealthDay, e: de.sryoshi.hcapp.core.CalorieEntry, datum: String) = run(s.instance) {
+        val api = client(s.instance)
+        val patch = CalorieEntryPatch().title(e.title).kcalPerServing(e.kcalPerServing).servings(e.servings)
+        if (e.hasNutrients) patch.proteinG(e.proteinG).fatG(e.fatG).carbsG(e.carbsG)
+        api.addCalorieEntry(datum, patch)
+        kalorienTag = api.calorieDay(s.date)
+        info = if (datum == s.date) "Mahlzeit dupliziert." else "Kopiert auf ${de.sryoshi.hcapp.core.Datum.anzeige(datum)}."
+    }
+
     fun updateCalorieEntry(s: Screen.HealthDay, id: Long, patch: CalorieEntryPatch) = run(s.instance) {
         val api = client(s.instance)
         api.updateCalorieEntry(id, patch)

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,6 +71,7 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
     var neu by remember { mutableStateOf(false) }
     var bearbeite by remember { mutableStateOf<CalorieEntry?>(null) }
     var kiFragen by remember { mutableStateOf(false) }
+    var kopiere by remember { mutableStateOf<CalorieEntry?>(null) }
     val tag = runCatching { LocalDate.parse(s.date) }.getOrNull() ?: LocalDate.now()
 
     Box(Modifier.fillMaxSize()) {
@@ -105,7 +107,7 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
                 if (t.entries.isEmpty()) item { Text("Noch nichts erfasst. Mit „+“ trägst du eine Mahlzeit ein.", color = Hc.farben.muted) }
                 items(t.entries, key = { it.id }) { e ->
                     Column {
-                        EintragZeile(e) { bearbeite = e }
+                        EintragZeile(e, onCopy = { kopiere = e }) { bearbeite = e }
                         if (e.nutrientsEstimated) {
                             TextButton(onClick = { vm.discardEstimate(s, e.id) }, enabled = !vm.busy) { Text("KI-Schätzung der Nährwerte zurücknehmen") }
                         }
@@ -126,6 +128,9 @@ fun HealthDayScreen(vm: AppViewModel, s: Screen.HealthDay) {
         FloatingActionButton(onClick = { neu = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { Icon(Icons.Default.Add, "Mahlzeit erfassen") }
     }
 
+    kopiere?.let { e ->
+        KopierenDialog(e, onOk = { datum -> kopiere = null; vm.copyCalorieEntry(s, e, datum) }, onCancel = { kopiere = null })
+    }
     if (kiFragen && t != null) {
         KiDialog(
             "Nährwerte schätzen",
@@ -183,7 +188,7 @@ private fun TagesKarte(t: CalorieDay) {
 }
 
 @Composable
-private fun EintragZeile(e: CalorieEntry, onClick: () -> Unit) {
+private fun EintragZeile(e: CalorieEntry, onCopy: () -> Unit, onClick: () -> Unit) {
     HcKarte(Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -197,8 +202,28 @@ private fun EintragZeile(e: CalorieEntry, onClick: () -> Unit) {
                 }
             }
             Text(kcalText(e.totalKcal), fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = onCopy) { Icon(Icons.Default.ContentCopy, "Mahlzeit kopieren") }
         }
     }
+}
+
+/** Mahlzeit auf einen Tag kopieren (duplizieren); vorgewählt ist heute. */
+@Composable
+private fun KopierenDialog(e: CalorieEntry, onOk: (String) -> Unit, onCancel: () -> Unit) {
+    var datum by remember { mutableStateOf(LocalDate.now().toString()) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Mahlzeit kopieren") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("„${e.title}“ (${kcalText(e.totalKcal)}) wird auf diesen Tag kopiert:", style = MaterialTheme.typography.bodyMedium)
+                DatumFeld("Kopieren auf", datum, { d -> if (d != null) datum = d }, Modifier.fillMaxWidth())
+                Text("Das Original bleibt unverändert.", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onOk(datum) }) { Text("Kopieren") } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Abbrechen") } },
+    )
 }
 
 // ── Mahlzeit erfassen / ändern ──────────────────────────────────────────
