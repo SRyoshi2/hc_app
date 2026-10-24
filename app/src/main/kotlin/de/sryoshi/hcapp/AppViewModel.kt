@@ -80,7 +80,11 @@ sealed interface Screen {
     data object AddInstance : Screen
 
     /** [meta] ist gesetzt, wenn die Instanz neu hinzugefügt wird; sonst meldet sich ein bekanntes Konto neu an. */
-    data class Login(val url: String, val meta: Meta, val username: String = "", val existing: Instance? = null) : Screen
+    data class Login(
+        val url: String, val meta: Meta, val username: String = "", val existing: Instance? = null,
+        /** Eigener Name, der beim Anlegen der Instanz übernommen wird. */
+        val alias: String = "",
+    ) : Screen
     data class Home(val instance: Instance, val me: Me) : Screen
     data class Lists(val instance: Instance, val me: Me) : Screen
     data class Items(val instance: Instance, val me: Me, val key: String, val title: String) : Screen
@@ -343,11 +347,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Instanzen ───────────────────────────────────────────────────────
 
-    fun connect(eingabe: String) = run {
+    fun connect(eingabe: String, alias: String = "") = run {
         val url = InstanceUrl.normalisieren(eingabe)
         val meta = ApiClient(url).meta()
         when (val c = Compatibility.pruefen(meta)) {
-            Compatibility.Ok -> screen = Screen.Login(url, meta)
+            Compatibility.Ok -> screen = Screen.Login(url, meta, alias = alias.trim())
             is Compatibility.InstanceTooOld ->
                 error = "Diese Instanz ist zu alt für die App (API-Version ${c.serverApi}). Bitte HomeCenter aktualisieren."
             is Compatibility.ClientTooOld ->
@@ -358,7 +362,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun login(login: Screen.Login, benutzer: String, passwort: String) = run {
         val antwort = ApiClient(login.url).login(benutzer.trim(), passwort, Build.MODEL ?: "Android")
         val instanz = (login.existing ?: Instance(url = login.url, name = login.meta.productName, mode = login.meta.mode,
-            username = antwort.user.username, displayName = antwort.user.displayName))
+            username = antwort.user.username, displayName = antwort.user.displayName, alias = login.alias))
             .copy(name = login.meta.productName, mode = login.meta.mode,
                 username = antwort.user.username, displayName = antwort.user.displayName)
         store.speichern(instanz, antwort.token)
@@ -391,6 +395,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Das Token auf dem Server zu widerrufen ist gut, aber nicht zwingend: ohne Verbindung wird es lokal gelöscht.
         runCatching { client(instance).logout() }
         store.tokenVerwerfen(instance.id)
+        sitzungenLesen()
+    }
+
+    /** Setzt den eigenen Namen der Instanz (leer = Produktname). */
+    fun renameInstance(instance: Instance, alias: String) {
+        store.aktualisieren(instance.copy(alias = alias.trim()))
         sitzungenLesen()
     }
 

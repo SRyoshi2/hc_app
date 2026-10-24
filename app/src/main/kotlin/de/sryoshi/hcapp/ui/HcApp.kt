@@ -97,7 +97,7 @@ fun HcApp(vm: AppViewModel) {
         Screen.Instances -> "Instanzen"
         Screen.AddInstance -> "Instanz hinzufügen"
         is Screen.Login -> s.meta.productName
-        is Screen.Home -> s.instance.name
+        is Screen.Home -> s.instance.anzeigename
         is Screen.Lists -> "Einkaufslisten"
         is Screen.Items -> s.title
         is Screen.Recipes -> "Rezeptverwaltung"
@@ -239,20 +239,46 @@ private fun InstancesScreen(vm: AppViewModel) {
 @Composable
 private fun InstanceCard(vm: AppViewModel, i: Instance) {
     var entfernen by remember { mutableStateOf(false) }
+    var umbenennen by remember { mutableStateOf(false) }
     val angemeldet = i.id in vm.angemeldet
     HcKarte(Modifier.fillMaxWidth(), onClick = { vm.open(i) }) {
         Column(Modifier.padding(start = 16.dp, top = 16.dp, end = 8.dp, bottom = 4.dp)) {
-            Text(i.name, style = MaterialTheme.typography.titleMedium)
-            Text(i.url, style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+            Text(i.anzeigename, style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (i.alias.isNotBlank() && i.alias != i.name) "${i.name} · ${i.url}" else i.url,
+                style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
+            )
             Text(
                 if (angemeldet) "Angemeldet als ${i.displayName}" else "Abgemeldet – zum Anmelden antippen",
                 style = MaterialTheme.typography.bodySmall, color = if (angemeldet) Hc.farben.muted else MaterialTheme.colorScheme.primary,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 if (angemeldet) TextButton(onClick = { vm.signOut(i) }) { Text("Abmelden") }
+                TextButton(onClick = { umbenennen = true }) { Text("Bearbeiten") }
                 TextButton(onClick = { entfernen = true }) { Text("Entfernen") }
             }
         }
+    }
+    if (umbenennen) {
+        var alias by remember { mutableStateOf(i.alias) }
+        AlertDialog(
+            onDismissRequest = { umbenennen = false },
+            title = { Text("Instanz bearbeiten") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        alias, { alias = it.take(40) }, label = { Text("Name der Instanz (optional)") }, singleLine = true,
+                        placeholder = { Text(i.name) }, modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Der Name erscheint nur in dieser App, damit du mehrere Instanzen unterscheiden kannst. Leer lassen zeigt „${i.name}“.",
+                        style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { umbenennen = false; vm.renameInstance(i, alias) }) { Text("Speichern") } },
+            dismissButton = { TextButton(onClick = { umbenennen = false }) { Text("Abbrechen") } },
+        )
     }
     if (entfernen) {
         AlertDialog(
@@ -268,6 +294,7 @@ private fun InstanceCard(vm: AppViewModel, i: Instance) {
 @Composable
 private fun AddInstanceScreen(vm: AppViewModel) {
     var adresse by rememberSaveable { mutableStateOf("") }
+    var alias by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Adresse deiner HomeCenter-Instanz, z. B. homecenter.example.de oder http://192.168.1.20:8000 im lokalen Netz.")
         OutlinedTextField(
@@ -275,8 +302,13 @@ private fun AddInstanceScreen(vm: AppViewModel) {
             label = { Text("Adresse") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
         )
+        OutlinedTextField(
+            value = alias, onValueChange = { alias = it.take(40) },
+            label = { Text("Name der Instanz (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("Nur für die Übersicht in der App. Leer: Family Manager bzw. Office Manager.") },
+        )
         ErrorText(vm)
-        Button(onClick = { vm.connect(adresse) }, enabled = !vm.busy && adresse.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { vm.connect(adresse, alias) }, enabled = !vm.busy && adresse.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
             Text("Verbinden")
         }
     }
@@ -287,7 +319,10 @@ private fun LoginScreen(vm: AppViewModel, s: Screen.Login) {
     var benutzer by rememberSaveable { mutableStateOf(s.username) }
     var passwort by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("${s.meta.productName} · ${s.url}", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+        Text(
+            (s.existing?.alias?.takeIf { it.isNotBlank() } ?: s.alias).let { if (it.isBlank()) s.meta.productName else "$it (${s.meta.productName})" } + " · ${s.url}",
+            style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
+        )
         OutlinedTextField(
             value = benutzer, onValueChange = { benutzer = it; vm.clearError() },
             label = { Text("Benutzername") }, singleLine = true, modifier = Modifier.fillMaxWidth(),

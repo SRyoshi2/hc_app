@@ -9,7 +9,7 @@ die Anmeldung erfolgt mit Benutzername und Passwort. Die App spricht die Schnitt
 
 | Bereich | Stand |
 |---|---|
-| Instanzen verwalten, Verbindungsprüfung (`/meta/`, Versionsabgleich) | umgesetzt |
+| Instanzen verwalten (mit eigenem Namen je Instanz, optional), Verbindungsprüfung (`/meta/`, Versionsabgleich) | umgesetzt |
 | Anmeldung mit Token (im Android Keystore verschlüsselt), Abmelden | umgesetzt |
 | Einkaufsliste (Listen, Artikel, Abhaken, Löschen) | umgesetzt |
 | Rezepte lesen (eigene, entdecken, Suche), Rezeptdetail, Portionen wählen und Zutaten in eine bestehende oder neue Einkaufsliste übernehmen, öffentliche Rezepte kopieren | umgesetzt (API Phase 2) |

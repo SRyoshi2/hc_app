@@ -17,7 +17,12 @@ data class Instance(
     val mode: String,
     val username: String,
     val displayName: String,
-)
+    /** Eigener Name für die Übersicht in der App (optional); leer = Produktname der Instanz. */
+    val alias: String = "",
+) {
+    /** Was die App zeigt: der eigene Name, sonst der Produktname. */
+    val anzeigename: String get() = alias.ifBlank { name }
+}
 
 class InstanceStore(context: Context) {
     private val prefs = context.getSharedPreferences("instances", Context.MODE_PRIVATE)
@@ -35,7 +40,7 @@ class InstanceStore(context: Context) {
             .apply()
     }
 
-    /** Ändert die Angaben einer bekannten Instanz (Name, Betriebsart), ohne das Token anzufassen. */
+    /** Ändert die Angaben einer bekannten Instanz (Name, Betriebsart, eigener Name), ohne das Token anzufassen. */
     fun aktualisieren(instanz: Instance) {
         val neu = alle().map { if (it.id == instanz.id) instanz else it }
         prefs.edit().putString(LISTE, json.encodeToString(serializer, neu)).apply()
