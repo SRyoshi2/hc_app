@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
@@ -24,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -119,46 +122,57 @@ fun DownloadDetailScreen(vm: AppViewModel, s: Screen.DownloadDetail) {
     val ablegen = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null && d != null) vm.saveDownload(s, d, uri)
     }
+    val fortschritt = vm.downloadFortschritt
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ErrorText(vm)
-        if (d == null) return@Column
-        HcKarte(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(d.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(metaZeile(d), color = Hc.farben.muted)
-                if (d.description.isNotBlank()) HtmlText(d.description, Modifier.padding(top = 4.dp), MaterialTheme.typography.bodyMedium)
-                else if (d.descriptionText.isNotBlank()) Text(d.descriptionText)
-            }
-        }
-        HcKarte(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Zeile("Datei", d.filename)
-                Zeile("Größe", d.sizeText)
-                Zeile("Abrufe", d.downloads.toString())
-                Zeile("Aktualisiert", Datum.anzeige(d.updatedAt.take(10)))
-                if (d.sha256.isNotBlank()) {
-                    Text("SHA-256", style = MaterialTheme.typography.labelMedium, color = Hc.farben.muted)
-                    Text(d.sha256, style = MaterialTheme.typography.bodySmall)
+    // Der Inhalt scrollt (lange Beschreibung, Prüfsumme, kleine Bildschirme); der Knopf steht darunter fest und ist immer sichtbar.
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 16.dp, top = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ErrorText(vm)
+            if (d == null) {
+                if (!vm.busy) OutlinedButton(onClick = { vm.loadDownload(s) }, modifier = Modifier.fillMaxWidth()) { Text("Erneut laden") }
+            } else {
+                HcKarte(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(d.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(metaZeile(d), color = Hc.farben.muted)
+                        if (d.description.isNotBlank()) HtmlText(d.description, Modifier.padding(top = 4.dp), MaterialTheme.typography.bodyMedium)
+                        else if (d.descriptionText.isNotBlank()) Text(d.descriptionText)
+                    }
+                }
+                HcKarte(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Zeile("Datei", d.filename)
+                        Zeile("Größe", d.sizeText)
+                        Zeile("Abrufe", d.downloads.toString())
+                        Zeile("Aktualisiert", Datum.anzeige(d.updatedAt.take(10)))
+                        if (d.sha256.isNotBlank()) {
+                            Text("SHA-256", style = MaterialTheme.typography.labelMedium, color = Hc.farben.muted)
+                            Text(d.sha256, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                if (fortschritt != null) {
+                    val gesamt = d.size
+                    if (gesamt != null && gesamt > 0) LinearProgressIndicator(progress = { (fortschritt.toFloat() / gesamt).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text("${groesseText(fortschritt)}${d.size?.takeIf { it > 0 }?.let { " von ${groesseText(it)}" } ?: ""} geladen", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
                 }
             }
         }
-        val fortschritt = vm.downloadFortschritt
-        if (fortschritt != null) {
-            val gesamt = d.size
-            if (gesamt != null && gesamt > 0) LinearProgressIndicator(progress = { (fortschritt.toFloat() / gesamt).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text("${groesseText(fortschritt)}${d.size?.let { " von ${groesseText(it)}" } ?: ""} geladen", style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(
+                onClick = { if (d != null) ablegen.launch(d.filename.ifBlank { d.title }) }, enabled = d != null && fortschritt == null && !vm.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Icon(Icons.Default.Download, null); Text("  Herunterladen") }
+            Text(
+                "Die Datei wird dort gespeichert, wo du es wählst; die Prüfsumme wird nach dem Laden mit der des Servers verglichen. " +
+                    "Ein abgebrochener Ladevorgang lässt sich nicht fortsetzen.",
+                style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
+            )
         }
-        Button(
-            onClick = { ablegen.launch(d.filename.ifBlank { d.title }) }, enabled = fortschritt == null && !vm.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Icon(Icons.Default.Download, null); Text("  Herunterladen") }
-        Text(
-            "Die Datei wird dort gespeichert, wo du es wählst; die Prüfsumme wird nach dem Laden mit der des Servers verglichen. " +
-                "Ein abgebrochener Ladevorgang lässt sich nicht fortsetzen.",
-            style = MaterialTheme.typography.bodySmall, color = Hc.farben.muted,
-        )
     }
 }
 
